@@ -1,0 +1,27 @@
+name: trackerx
+workdir: $HOME/Sources/patas/test
+repeat: 3
+max_tries: 4
+cmd:
+  - ls -la {v1}
+vars:
+
+  - name: v1
+    type: list
+    values:
+      - a
+      - b
+      - c
+      - d
+
+  - name: v2
+    type: arithmetic
+    min: 1
+    max: 10
+    factor: 1
+
+  - name: v3
+    type: geometric
+    min: 1
+    max: 17
+    factor: 2
