@@ -37,10 +37,11 @@ class Node(Schema):
         
         self.tags = []
         self.hostname = ""
-        self.procs = 1
+        self.workers = 1
         self.user = None
         self.port = 22
         self.name = 'noname'
+        self.private_key = None
         self._credential = None
 
         if data is not None:
@@ -49,7 +50,7 @@ class Node(Schema):
     def init_from(self, data):
 
         self.load_property('hostname', data, mandatory=True)
-        self.load_property('procs', data)
+        self.load_property('workers', data)
         self.load_property('tags', data)
         self.load_property('user', data)
         self.load_property('port', data)

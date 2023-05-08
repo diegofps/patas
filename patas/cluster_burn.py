@@ -1,5 +1,5 @@
 from .utils import expand_path, error, warn, info, debug, critical, readlines, clean_folder, colors
-from .schemas import Experiment, Cluster
+from .schemas import Experiment, Cluster, Node
 
 from multiprocessing import Process, Queue
 from datetime import datetime
@@ -38,14 +38,15 @@ ECHO_CMD_OFF = b" echo -en \"\n $? %s\"" % KEY_CMD_OFF.replace(b"-", b"-\b-")
 
 
 def combine_variables(variables, combination=[]):
+
     if len(variables) == len(combination):
         yield copy.copy(combination)
     
     else:
         var = variables[len(combination)]
-        name = var.get_name()
+        name = var.name
         
-        for value in var.get_values():
+        for value in var.values:
             combination.append({"n": name, "v": value})
 
             for tmp in combine_variables(variables, combination):
@@ -77,20 +78,19 @@ class QueueMsg(dict):
 class Task:
 
     def __init__(self, 
-            experiment_name, output_dir, work_dir, experiment_idd, perm_idd, 
-            run_idd, task_idd, combination, cmdline, cmd_idd):
+            experiment_name, task_output_dir, work_dir, experiment_idd, perm_idd, 
+            repeat_idd, task_idd, combination, cmdlines):
 
         self.experiment_name = experiment_name
         self.experiment_idd = experiment_idd
+        self.output_dir = task_output_dir
         self.combination = combination
-        self.output_dir = output_dir
+        self.repeat_idd = repeat_idd
         self.work_dir = work_dir
         self.perm_idd = perm_idd
         self.task_idd = task_idd
+        self.cmdlines = cmdlines
         self.assigned_to = None
-        self.cmdline = cmdline
-        self.run_idd = run_idd
-        self.cmd_idd = cmd_idd
         self.started_at = None
         self.ended_at = None
         self.duration = None
@@ -103,10 +103,10 @@ class Task:
     def __repr__(self):
         comb = ";".join(str(k) + "=" + str(v) for k, v in self.combination.items())
         return "%d %d %d %d %s %s" % (self.experiment_idd, self.perm_idd, 
-                    self.run_idd, self.task_idd, comb, self.cmdline)
+                    self.repeat_idd, self.task_idd, comb, self.cmdlines)
 
 
-class ConnectorBuilder:
+class ExecutorBuilder:
 
     def __init__(self, connector, machine):
         self.connector = connector
@@ -116,30 +116,53 @@ class ConnectorBuilder:
         return self.connector(self.machine)
 
 
-class BashConnector:
+class BashExecutor:
     pass
 
 
-class SSHConnector:
+class SSHExecutor:
 
-    def __init__(self, machine):
+    def __init__(self, node):
 
         #self.ssh = BasicSSH(machine.user, machine.ip, machine.ip)
-        self.machine = machine
+        self.node = node
         self.is_alive = False
 
         # Opens a pseudo-terminal
         self.master, self.slave = pty.openpty()
-        self.start_bash()
+        self._start_bash()
         
-        self.credential = self.machine.credential.encode()
-        self.conn_string = b" ssh -t %s '%s ; bash' ; %s\n" % (self.credential, ECHO_SSH_ON, ECHO_SSH_OFF)
+        self.conn_string = self._build_conn_string(self.node)
 
-        self.connect()
+        self._connect()
+    
+    def _build_connnection_string(self, node):
+
+        str = [' ssh']
+
+        if node.private_key:
+            str.append(' -i ')
+            str.append(node.private_key)
+        
+        if node.port:
+            str.append(' -p ')
+            str.append(node.port)
+
+        str.append(' -t ')
+        str.append(node.credential)
+
+        str.append(" '")
+        str.append(ECHO_SSH_ON)
+        str.append(" ; bash' ; ")
+        str.append(ECHO_SSH_OFF)
+        str.append('\n')
+        
+        return "".join(str).encode()
 
 
-    def start_bash(self):
+    def _start_bash(self):
         debug("Starting bash")
+
         self.popen = Popen(
                 shlex.shlex("bash"),
                 preexec_fn=os.setsid,
@@ -149,11 +172,12 @@ class SSHConnector:
                 universal_newlines=True)
 
 
-    def connect(self):
+    def _connect(self):
         conn_try = 1
 
         while True:
             debug("Connection attempt:", conn_try)
+
             os.write(self.master, self.conn_string)
             found_ssh_off = False
             found_ssh_on = False
@@ -162,12 +186,12 @@ class SSHConnector:
             while True:
                 if self.popen.poll() is not None:
                     warn("Bash has died, starting it again")
-                    self.start_bash()
+                    self._start_bash()
                 
                 r, _, _ = select.select([self.master], [], [])
 
                 if not self.master in r:
-                    warn("Unexpected file descriptor while connecting")
+                    warn("Unexpected file descriptor while stablishing connection")
                     continue
                 
                 for i in range(*readlines(self.master, lines, verbose=False)):
@@ -185,7 +209,7 @@ class SSHConnector:
                     return
                 
                 if found_ssh_off:
-                    warn("SSH connection against %s has failed, trying again" % self.credential)
+                    warn("SSH connection against %s has failed, trying again" % self.node.name)
                     break
 
             warn("Sleeping before next try...")
@@ -244,13 +268,13 @@ class SSHConnector:
         return (status == "0"), lines[output_start:output_end], status
 
 
-class Proc:
+class WorkerProcess:
 
-    def __init__(self, proc_idd, connection_builder, env_variables):
+    def __init__(self, worker_idd, connection_builder, env_variables):
 
         self.connection_builder = connection_builder
         self.env_variables = env_variables
-        self.proc_idd = proc_idd
+        self.worker_idd = worker_idd
         self.process = None
         self.queue = None
 
@@ -260,15 +284,16 @@ class Proc:
         self.process = Process(target=self.run, args=(self.queue, queue_master))
         self.process.start()
 
+
     def debug(self, *args):
-        debug(self.proc_idd, "|", *args)
+        debug(self.worker_idd, "|", *args)
 
 
     def run(self, queue_in, queue_master):
         try:
             conn = self.connection_builder()
 
-            msg_out = QueueMsg("ready", self.proc_idd)
+            msg_out = QueueMsg("ready", self.worker_idd)
             queue_master.put(msg_out)
             
             while True:
@@ -278,14 +303,14 @@ class Proc:
                     #self.debug("Starting execute")
                     success = self.execute(msg_in, conn)
 
-                    msg_out = QueueMsg("finished", self.proc_idd)
+                    msg_out = QueueMsg("finished", self.worker_idd)
                     msg_out.success = success
                     queue_master.put(msg_out)
 
                     if not conn.is_alive:
                         conn = self.connection_builder()
 
-                    msg_out = QueueMsg("ready", self.proc_idd)
+                    msg_out = QueueMsg("ready", self.worker_idd)
                     queue_master.put(msg_out)
                 
                 elif msg_in.action == "terminate":
@@ -294,16 +319,18 @@ class Proc:
                 else:
                     warn("Unknown action:", msg_in.action)
             
-            msg_out = QueueMsg("ended", self.proc_idd)
+            msg_out = QueueMsg("ended", self.worker_idd)
             queue_master.put(msg_out)
         except KeyboardInterrupt:
             pass
 
 
     def execute(self, msg_in, conn):
-        task = msg_in.task
+
+        task:Task = msg_in.task
 
         # Prepare the initrc
+
         variables = copy.copy(self.env_variables)
         variables["WUP_WORK_DIR"] = task.work_dir
 
@@ -313,20 +340,26 @@ class Proc:
         initrc = [b"export %s=\"%s\"" % (a.encode(), b.encode()) for a, b in variables.items()]
         initrc.insert(0, b"cd \"%s\"" % task.work_dir.encode())
 
+        # Prepare the command line we will execute
+
+        cmdline = " ; ".join(task.cmdlines).encode()
+
         # Execute this task
-        #self.debug("Calling execute on connection")
+
         task.started_at = datetime.now()
-        task.success, task.output, task.status = conn.execute(initrc, task.cmdline.encode())
+        task.success, task.output, task.status = conn.execute(initrc, cmdline)
         task.ended_at = datetime.now()
         task.duration = (task.ended_at - task.started_at).total_seconds()
 
         # Create the task folder and clean any old .done file
+
         done_filepath = os.path.join(task.output_dir, ".done")
         os.makedirs(task.output_dir, exist_ok=True)
         if os.path.exists(done_filepath):
             os.remove(done_filepath)
 
         # Dump task info
+
         info = copy.copy(task.__dict__)
         info["env_variables"] = variables
         del info["output"]
@@ -336,18 +369,20 @@ class Proc:
             yaml.dump(info, fout, default_flow_style=False)
         
         # Dump task output
-        #self.debug("Writing task output")
+
         filepath = os.path.join(task.output_dir, "output.txt")
         with open(filepath, "wb") as fout:
             fout.writelines(task.output)
 
+        # Create .done file if the task succeded
+
         if task.success:
-            # Create .done file
             with open(done_filepath, 'a'):
                 os.utime(done_filepath, None)
 
+        # Write output to stdout if the task failed
+
         else:
-            # Write output to stdout if task has failed
             critical("Task %d has failed. Exit code: %s" % (task.task_idd, task.status))
             for line in task.output:
                 os.write(sys.stdout.fileno(), line)
@@ -377,7 +412,7 @@ class ClusterBurn():
         self._summary(self.experiments, self.clusters)
         self._validate_signature()
         self.tasks = self._create_tasks()
-        self.procs = self._create_procs()
+        self.workers = self._create_workers()
         self._burn()
 
 
@@ -385,38 +420,41 @@ class ClusterBurn():
 
         # Display experiments
         total_tasks = 0
+        experiment: Experiment
 
-        for e in experiments:
-            variables = e.vars
+        for experiment in experiments:
+            variables = experiment.vars
             current = 1
 
-            for v in variables:
-                values = v.values
+            for var in variables:
+                values = var.values
                 ll = len(values)
-                print("\t%s (%d) : %s" % (v.name, ll, str(values)))
+                print("\t%s (%d) : %s" % (var.name, ll, str(values)))
                 current *= ll
             
-            current *= e.repeat
-            print(f"Experiment '{e.name}' has {len(variables)} variable(s) and {current} task(s)")
+            current *= experiment.repeat
+            print(f"Experiment '{experiment.name}' has {len(variables)} variable(s) and {current} task(s)")
             total_tasks += current
         
         print(f"Total number of tasks: {total_tasks}")
 
         # Display clusters
         total_nodes = 0
-        total_procs = 0
+        total_workers = 0
+        node:Node = None
+        cluster:Cluster = None
 
         for cluster in clusters:
             total_nodes += len(cluster.nodes)
-            print(f"\tCluster '{cluster.name}' has {len(cluster.nodes)} proc(s)")
+            print(f"\tCluster '{cluster.name}' has {len(cluster.nodes)} worker(s)")
 
             for node in cluster.nodes:
-                total_procs += node.procs
-                print(f"\tNode '{node.name}' has {node.procs} proc(s)")
+                total_workers += node.workers
+                print(f"\tNode '{node.name}' has {node.workers} worker(s)")
         
         print(f"Total number of clusters: {len(clusters)}")
         print(f"Total number of nodes: {total_nodes}")
-        print(f"Total number of procs: {total_procs}")
+        print(f"Total number of workers: {total_workers}")
 
 
     def _validate_signature(self):
@@ -464,59 +502,58 @@ class ClusterBurn():
             yaml.dump(info, fout, default_flow_style=False)
 
 
-    def _create_tasks(self):
+    def _create_tasks(self, experiments, output_folder, repeat, redo_tasks, tasks_filter):
+
         print("Creating tasks...")
 
+        e:Experiment = None
+        combination_idd = -1
         experiment_idd = -1
-        perm_idd = -1
         #run_idd = -1
         task_idd = -1
         tasks = []
 
-        for e in self.experiments:
+        for e in experiments:
+
             experiment_idd += 1
 
-            variables = e.get_variables(self.default_variables)
-            work_dir = e.get_work_dir(self.default_workdir)
-
-            experiment_filepath = os.path.join(self.output_folder, "experiments", e.name)
+            experiment_filepath = os.path.join(output_folder, "experiments", e.name)
             info_filepath = os.path.join(experiment_filepath, "info.yml")
             os.makedirs(experiment_filepath, exist_ok=True)
 
             info = {
-                "name": e.name,
-                "work_dir": work_dir,
-                "commands": [c.cmdline for c in e.commands],
+                "experiment_name": e.name,
+                "workdir": e.workdir,
+                "commands": e.cmd,
+                "repeat": e.repeat,
+                "max_tries": e.max_tries,
                 "variables": [
                     { 
-                        "name": v.get_name(),
-                        "values": v.get_values() 
-                    } for v in variables 
+                        "name": v.name,
+                        "values": v.values 
+                    } for v in e.vars
                 ]
             }
 
             with open(info_filepath, "w") as fout:
                 yaml.dump(info, fout, default_flow_style=False)
 
-            for combination in combine_variables(variables):
-                perm_idd += 1
+            for combination in combine_variables(e.vars):
+                combination_idd += 1
 
-                for run_idd in range(self.num_runs):
-                    #run_idd += 1
+                for repeat_idd in range(repeat):
+                    task_idd += 1
 
-                    for cmd_idd, cmd in enumerate(e.commands):
-                        task_idd += 1
+                    if tasks_filter and not any(a <= task_idd < b for a, b in tasks_filter):
+                        continue
 
-                        if self.tasks_filter and not any(a<= task_idd < b for a, b in self.tasks_filter):
-                            continue
+                    task_output_folder = os.path.join(experiment_filepath, str(task_idd))
 
-                        output_dir = os.path.join(experiment_filepath, str(task_idd))
+                    if not redo_tasks and os.path.exists(os.path.join(task_output_folder, ".done")):
+                        continue
 
-                        if not self.redo_tasks and os.path.exists(os.path.join(output_dir, ".done")):
-                            continue
-
-                        task = Task(e.name, output_dir, work_dir, experiment_idd, perm_idd, run_idd, task_idd, combination, cmd.cmdline, cmd_idd)
-                        tasks.append(task)
+                    task = Task(e.name, task_output_folder, e.workdir, experiment_idd, combination_idd, repeat_idd, task_idd, combination, e.cmd)
+                    tasks.append(task)
 
         if not tasks:
             error("No tasks to do")
@@ -524,48 +561,43 @@ class ClusterBurn():
         return tasks
 
 
-    def _create_procs(self):
+    def _create_workers(self, clusters):
+
         print("Starting cluster...")
 
-        if self.cluster:
-            cluster = self.clusterfile()
+        cluster_idd = -1
+        worker_idd = -1
+        node_idd = -1
 
-        else:
-            cluster = ClusterFile()
-            m = cluster.create_machine("local_arch", "local")
-            m.hostname = "localhost"
-            m.procs = os.cpu_count()
+        workers = []
 
-        arch_idd = -1
-        machine_idd = -1
-        proc_idd = -1
+        cluster:Cluster = None
+        node:Node = None
 
-        result = []
+        for cluster in clusters:
+            cluster_idd += 1
 
-        for arch_name, machines in cluster.archs.items():
-            arch_idd += 1
+            for node in cluster.nodes:
+                node_idd += 1
 
-            for machine_name, machine in machines.items():
-                machine_idd += 1
+                for _ in range(node.workers):
+                    worker_idd += 1
 
-                for _ in range(machine.procs):
-                    proc_idd += 1
-
-                    builder = ConnectorBuilder(SSHConnector, machine)
+                    builder = ExecutorBuilder(SSHExecutor, node)
 
                     env_variables = {
-                        "WUP_MACHINE_NAME": machine_name,
-                        "WUP_ARCH_NAME": arch_name,
+                        "PATAS_CLUSTER_NAME": cluster.name,
+                        "PATAS_NODE_NAME": node.name,
 
-                        "WUP_MACHINE_IDD": str(machine_idd),
-                        "WUP_ARCH_IDD": str(arch_idd),
-                        "WUP_PROC_IDD": str(proc_idd)
+                        "PATAS_CLUSTER_ID": str(cluster_idd),
+                        "PATAS_NODE_ID": str(node_idd),
+                        "PATAS_WORKER_ID": str(worker_idd)
                     }
 
-                    proc = Proc(proc_idd, builder, env_variables)
-                    result.append(proc)
+                    worker = WorkerProcess(worker_idd, builder, env_variables)
+                    workers.append(worker)
         
-        return result
+        return workers
 
 
     def _burn(self):
@@ -580,13 +612,13 @@ class ClusterBurn():
         self.ended = []
 
         len_todo = len(str(len(self.todo)))
-        len_proc = len(str(len(self.procs)))
+        len_workers = len(str(len(self.workers)))
         
 
         # Start loop
-        info("Starting %d worker(s)" % len(self.procs))
-        for proc in self.procs:
-            proc.start(self.queue)
+        info("Starting %d worker(s)" % len(self.workers))
+        for worker in self.workers:
+            worker.start(self.queue)
 
         # Main loop
         try:
@@ -594,16 +626,16 @@ class ClusterBurn():
             while self.todo or self.doing:
                 msg_in = self.queue.get()
 
-                l1 = str(len(self.todo))
-                l2 = str(len(self.doing))
-                l3 = str(len(self.done))
+                l1 = str(len(self.todo    ))
+                l2 = str(len(self.doing   ))
+                l3 = str(len(self.done    ))
                 l4 = str(len(self.given_up))
 
                 d  = colors.gray("|%s|" % str(datetime.now()))
-                l1 = colors.white(" " * (len_todo - len(l1)) + l1 + " |")
-                l2 = colors.white(" " * (len_proc - len(l2)) + l2 + " |")
-                l3 = colors.green(" " * (len_todo - len(l3)) + l3 + " |")
-                l4 = colors.red(" " * (len_todo - len(l4)) + l4 + " |")
+                l1 = colors.white(" " * (len_todo    - len(l1)) + l1 + " |")
+                l2 = colors.white(" " * (len_workers - len(l2)) + l2 + " |")
+                l3 = colors.green(" " * (len_todo    - len(l3)) + l3 + " |")
+                l4 = colors.red  (" " * (len_todo    - len(l4)) + l4 + " |")
 
                 msg = "%s %s %s %s %s" % (d, l1, l2, l3, l4)
                 print(msg)
@@ -629,14 +661,14 @@ class ClusterBurn():
 
         # Ending loop
         try:
-            info("Terminating child processes...")
+            info("Terminating workers...")
             # Sending TERM signal
-            for proc in self.procs:
+            for worker in self.workers:
                 msg = QueueMsg("terminate")
-                proc.queue.put(msg)
+                worker.queue.put(msg)
             
             # Waiting for ENDED signal
-            while len(self.procs) != len(self.ended):
+            while len(self.workers) != len(self.ended):
                 msg = self.queue.get()
 
                 if msg.action == "ended":
@@ -645,10 +677,10 @@ class ClusterBurn():
                     d = colors.gray("|%s|" % str(datetime.now()))
 
                     l1 = str(len(self.ended))
-                    l2 = str(len(self.procs))
+                    l2 = str(len(self.workers))
 
-                    l1 = " " * (len_proc - len(l1)) + l1
-                    l2 = " " * (len_proc - len(l2)) + l2
+                    l1 = " " * (len_workers - len(l1)) + l1
+                    l2 = " " * (len_workers - len(l2)) + l2
 
                     print("%s %sEnded %s / %s%s" % (d, colors.WHITE, l1, l2, colors.RESET))
                 
@@ -670,7 +702,7 @@ class ClusterBurn():
             msg_out.task.tries += 1
 
             self.doing.append(msg_out.task)
-            self.procs[msg_in.source].queue.put(msg_out)
+            self.workers[msg_in.source].queue.put(msg_out)
         
         else:
             self.idle.append(msg_in.source)
@@ -685,7 +717,7 @@ class ClusterBurn():
             warn("Received finished msg but the task was not found inside the doing list")
             return
         
-        task = self.doing[i]
+        task:Task = self.doing[i]
         del self.doing[i]
 
         if msg_in.success:
@@ -708,4 +740,4 @@ class ClusterBurn():
         msg_out.task.assigned_to = target
         msg_out.task.tries += 1
 
-        self.procs[target].queue.put(msg_out)
+        self.workers[target].queue.put(msg_out)

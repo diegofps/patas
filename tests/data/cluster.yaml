@@ -4,7 +4,8 @@ nodes:
     user: dsouza
     hostname: 192.168.1.105
     port: 22
-    procs: 16
+    private_key: ~/.ssh/id_rsa.pub
+    workers: 16
     tags:
       - wespa
       - arch__x86_64
@@ -12,7 +13,7 @@ nodes:
     user: diego
     hostname: 192.168.1.109
     port: 22
-    procs: 1
+    workers: 1
     tags:
       - wespa
       - arch__aarch64

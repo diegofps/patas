@@ -1,14 +1,19 @@
 #!/usr/bin/env python3
 
-import argparse
-import sys
-
 try:
     from . import consts as c
 except:
     from patas import consts as c
 
 from .schemas import Cluster, Experiment, Node, ListVariable, ArithmeticVariable, GeometricVariable, load_cluster, load_experiment
+from .cluster_burn import ClusterBurn
+from .utils import error
+
+from multiprocessing import cpu_count
+
+import argparse
+import sys
+
 
 
 def show_main_syntax():
@@ -70,9 +75,9 @@ def do_exec_grid(argv):
 
     parser.add_argument('--node',
                         type=str,
-                        metavar=('NAME', 'USER@HOST:PORT', 'PROCS', 'TAG1', '...'),
+                        metavar=('NAME', 'USER@HOST:PORT', 'WORKERS', 'TAG1', '...'),
                         dest='cluster',
-                        help="adds a worker machine to the cluster",
+                        help="adds a machine with the given number of workers to the cluster",
                         action='append')
 
     parser.add_argument('-v', '--verbose',
@@ -90,7 +95,7 @@ def do_exec_grid(argv):
     parser.add_argument('-o',
                         type=str,
                         metavar='FOLDER',
-                        dest='raw_data_out',
+                        dest='output_folder',
                         help="folder to store the program outputs",
                         action='store')
 
@@ -155,6 +160,8 @@ def do_exec_grid(argv):
     # If experiment parameters are provided, create an experiment for them
     experiment = Experiment()
 
+    experiment.name = 'QuickExperiment'
+
     if args.repeat:
         experiment.repeat = args.repeat
     
@@ -205,22 +212,42 @@ def do_exec_grid(argv):
     
     # Otherwise, we will create a simple one for the local machine
     else:
-        from multiprocessing import cpu_count
 
         node = Node()
         node.name = 'LocalMachine'
         node.hostname = 'localhost'
-        node.procs = cpu_count()
+        node.workers = cpu_count()
 
         cluster = Cluster()
+        cluster.name = 'QuickCluster'
         cluster.nodes.append(node)
 
-    # Create the ClusterBurn 
+    # Prepare the tasks_filter
+    tasks_filter = []
+
+    for task in args.tasks_filter:
+        try:
+
+            cells = task.split(':')
+
+            if len(cells) == 2:
+                i1 = int(cells[0]) if cells[0] else 0
+                i2 = int(cells[1]) if cells[1] else float('inf')
+                tasks_filter.append((i1, i2))
+
+            elif len(cells) == 1:
+                i1 = int(cells[0]) if cells[0] else 0
+                tasks_filter.append((i1, i1+1))
+
+            else:
+                error(f'Invalid --task-filter: {task}')
+
+        except ValueError:
+            error(f'Invalid --task-filter: {task}')
+
+    # Create the ClusterBurn
     print(args)
-
-    #(tasks_filter, nodes_filter, output_dir, redo_tasks, recreate, experiments, clusters)
-
-    burn = ClusterBurn()
+    burn = ClusterBurn(tasks_filter, args.nodes_filter, args.output_folder, args.redo_tasks, args.recreate, experiments, clusters)
     burn.start()
 
 def do_parse(args):
