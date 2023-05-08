@@ -5,9 +5,9 @@ try:
 except:
     from patas import consts as c
 
-from .schemas import Cluster, Experiment, Node, ListVariable, ArithmeticVariable, GeometricVariable, load_cluster, load_experiment
-from .cluster_burn import GridExec
-from .utils import error
+from patas.schemas import Cluster, Experiment, Node, ListVariable, ArithmeticVariable, GeometricVariable, load_cluster, load_experiment
+from patas.grid_exec import GridExec
+from patas.utils import error
 
 from multiprocessing import cpu_count
 
@@ -52,35 +52,37 @@ def do_exec_grid(argv):
                         action='append')
 
     parser.add_argument('--redo',
-                        dest='redo',
+                        dest='redo_tasks',
                         help="forces patas to redo all tasks when an experiment is executed again",
                         action='store_true')
 
     parser.add_argument('--recreate',
-                        metavar='FOLDER',
                         dest='recreate',
                         help="recreate the entire output folder if it contains a different experiment configuration",
                         action='store_true')
 
     parser.add_argument('--filter-tasks',
                         type=str,
+                        default=[],
                         metavar='A:B',
-                        dest='filter_tasks',
+                        dest='task_filters',
                         help="restricts the tasks that will be executed [A:B, A:, :B, :]",
                         action='append')
 
     parser.add_argument('--filter-nodes',
                         type=str,
+                        default=[],
                         metavar='TAG',
                         nargs='*',
-                        dest='filter_nodes',
+                        dest='node_filters',
                         help="filter nodes that match these tags (AND)",
                         action='store')
 
     parser.add_argument('--node',
                         type=str,
-                        metavar=('NAME', 'USER@HOST:PORT', 'WORKERS', 'TAG1', '...'),
-                        dest='cluster',
+                        nargs='*',
+                        metavar='NAME USER@HOST:PORT WORKERS TAG1 ...',
+                        dest='node',
                         help="adds a machine with the given number of workers to the cluster",
                         action='append')
 
@@ -102,6 +104,7 @@ def do_exec_grid(argv):
 
     parser.add_argument('-o',
                         type=str,
+                        default='./tmp',
                         metavar='FOLDER',
                         dest='output_folder',
                         help="folder to store the program outputs",
@@ -228,27 +231,60 @@ def do_exec_grid(argv):
 
     if args.cluster:
         for filepath in args.cluster:
+            print(filepath)
             cluster = load_cluster(filepath)
             clusters.append(cluster)
     
-    # Otherwise, we will create a simple one for the local machine
+    # If nodes are provided, we will add them to the QuickCluster
 
-    else:
-
-        node = Node()
-        node.name = 'LocalMachine'
-        node.hostname = 'localhost'
-        node.workers = cpu_count()
-
+    if args.node:
+        
         cluster = Cluster()
         cluster.name = 'QuickCluster'
+        clusters.append(cluster)
+
+        for i, node_params in enumerate(args.node):
+
+            node = Node()
+            node.name = f'node{i}'
+
+            address      = node_params[0]
+            node.workers = int(node_params[1]) if len(node_params) > 1 else 1
+            node.tags    = node_params[2:] if len(node_params) > 2 else []
+
+            if ':' in address:
+                address, port = address.split(':', 1)
+                node.port = int(port)
+            
+            if '@' in address:
+                node.user, node.hostname = address.split('@', 1)
+                
+            else:
+                node.hostname = address
+
+            cluster.nodes.append(node)
+
+    # If no cluster or node is provided, we will create a simple one for the local machine
+
+    if not clusters:
+
+        node          = Node()
+        node.name     = 'LocalMachine'
+        node.hostname = 'localhost'
+        node.workers  = cpu_count()
+
+        cluster       = Cluster()
+        cluster.name  = 'QuickCluster'
+
         cluster.nodes.append(node)
+
+        clusters.append(cluster)
 
     # Prepare the tasks_filter
 
-    tasks_filter = []
+    task_filters = []
 
-    for task in args.tasks_filter:
+    for task in args.task_filters:
         try:
 
             cells = task.split(':')
@@ -256,11 +292,11 @@ def do_exec_grid(argv):
             if len(cells) == 2:
                 i1 = int(cells[0]) if cells[0] else 0
                 i2 = int(cells[1]) if cells[1] else float('inf')
-                tasks_filter.append((i1, i2))
+                task_filters.append((i1, i2))
 
             elif len(cells) == 1:
                 i1 = int(cells[0]) if cells[0] else 0
-                tasks_filter.append((i1, i1+1))
+                task_filters.append((i1, i1+1))
 
             else:
                 error(f'Invalid --task-filter: {task}')
@@ -271,7 +307,7 @@ def do_exec_grid(argv):
     # Create the ClusterBurn
 
     print(args)
-    burn = GridExec(tasks_filter, args.nodes_filter, args.output_folder, args.redo_tasks, args.recreate, args.confirmed, experiments, clusters)
+    burn = GridExec(task_filters, args.node_filters, args.output_folder, args.redo_tasks, args.recreate, args.confirmed, experiments, clusters)
     burn.start()
 
 def do_parse(args):

@@ -126,32 +126,32 @@ class SSHExecutor:
         self.master, self.slave = pty.openpty()
         self._start_bash()
         
-        self.conn_string = self._build_conn_string(self.node)
+        self.conn_string = self._build_connnection_string(self.node)
 
         self._connect()
     
     def _build_connnection_string(self, node):
 
-        str = [' ssh']
+        tokens = [b' ssh']
 
         if node.private_key:
-            str.append(' -i ')
-            str.append(node.private_key)
+            tokens.append(b' -i ')
+            tokens.append(node.private_key.encode())
         
         if node.port:
-            str.append(' -p ')
-            str.append(node.port)
+            tokens.append(b' -p ')
+            tokens.append(str(node.port).encode())
 
-        str.append(' -t ')
-        str.append(node.credential)
+        tokens.append(b' -t ')
+        tokens.append(node.credential.encode())
 
-        str.append(" '")
-        str.append(ECHO_SSH_ON)
-        str.append(" ; bash' ; ")
-        str.append(ECHO_SSH_OFF)
-        str.append('\n')
+        tokens.append(b" '")
+        tokens.append(ECHO_SSH_ON)
+        tokens.append(b" ; bash' ; ")
+        tokens.append(ECHO_SSH_OFF)
+        tokens.append(b'\n')
         
-        return "".join(str).encode()
+        return b"".join(tokens)
 
 
     def _start_bash(self):

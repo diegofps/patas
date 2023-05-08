@@ -194,6 +194,7 @@ class Experiment(Schema):
         self.workdir = None
         self.repeat = 1
         self.max_tries = 3
+        self.vars = []
     
     def init_from(self, data):
 
