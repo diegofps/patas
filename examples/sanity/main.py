@@ -10,7 +10,7 @@ def main(args):
     p2 = float(args[1])
     p3 = float(args[2])
 
-    time.sleep(2)
+    # time.sleep(1)
 
     print(f"Score: {p1*p2*p3}")
 

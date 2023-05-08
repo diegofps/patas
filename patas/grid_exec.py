@@ -1,5 +1,5 @@
-from .utils import expand_path, error, warn, info, debug, critical, readlines, clean_folder, estimate, human_time, colors
-from .schemas import Experiment, Cluster, Node
+from .utils import expand_path, error, warn, info, debug, critical, abort, readlines, clean_folder, estimate, human_time, colors
+from .schemas import Experiment, Cluster, Node, format_as_dict
 
 from multiprocessing import Process, Queue
 from datetime import datetime
@@ -31,7 +31,7 @@ ECHO_CMD_ON  = echo(KEY_CMD_ON)
 ECHO_CMD_OFF = b" echo -en \"\n $? %s\"" % KEY_CMD_OFF.replace(b"-", b"-\b-")
 
 
-def combine_variables(variables, combination=[]):
+def combine_variables(variables, combination={}):
 
     if len(variables) == len(combination):
         yield copy.copy(combination)
@@ -41,12 +41,12 @@ def combine_variables(variables, combination=[]):
         name = var.name
         
         for value in var.values:
-            combination.append({"n": name, "v": value})
-
+            combination[name] = value
+            
             for tmp in combine_variables(variables, combination):
                 yield tmp
             
-            combination.pop()
+        del combination[name]
 
 
 class QueueMsg(dict):
@@ -96,7 +96,7 @@ class Task:
     
     
     def __repr__(self):
-        comb = ";".join(str(k) + "=" + str(v) for k, v in self.combination.items())
+        comb = ";".join(f"{k}={v}" for k, v in self.combination.items())
         return "%d %d %d %d %s %s" % (self.experiment_idd, self.perm_idd, 
                     self.repeat_idd, self.task_idd, comb, self.cmdlines)
 
@@ -329,13 +329,13 @@ class WorkerProcess:
 
         # Prepare the initrc
 
-        variables = copy.copy(self.env_variables)
-        variables["WUP_WORK_DIR"] = task.work_dir
+        env_variables = copy.copy(self.env_variables)
+        env_variables["PATAS_WORK_DIR"] = task.work_dir
 
-        for v in task.combination:
-            variables[v["n"]] = str(v["v"])
+        for k,v in task.combination.items():
+            env_variables["PATAS_VAR_" + k] = str(v)
 
-        initrc = [b"export %s=\"%s\"" % (a.encode(), b.encode()) for a, b in variables.items()]
+        initrc = [b"export %s=\"%s\"" % (a.encode(), b.encode()) for a, b in env_variables.items()]
         initrc.insert(0, b"cd \"%s\"" % task.work_dir.encode())
 
         # Prepare the command line we will execute
@@ -359,7 +359,7 @@ class WorkerProcess:
         # Dump task info
 
         info = copy.copy(task.__dict__)
-        info["env_variables"] = variables
+        info["env_variables"] = env_variables
         del info["output"]
 
         filepath = os.path.join(task.output_dir, "info.yml")
@@ -420,6 +420,8 @@ class GridExec():
 
         # Display experiments
 
+        print(colors.white("\n --- Experiments --- \n"))
+
         total_tasks = 0
         experiment: Experiment
 
@@ -428,18 +430,18 @@ class GridExec():
             current = 1
 
             for var in variables:
-                values = var.values
-                ll = len(values)
-                print("\t%s (%d) : %s" % (var.name, ll, str(values)))
-                current *= ll
+                current *= len(var.values)
             
             current *= experiment.repeat
-            print(f"Experiment '{experiment.name}' has {len(variables)} variable(s) and {current} task(s)")
             total_tasks += current
-        
-        print(f"Total number of tasks: {total_tasks}")
 
+            print(f"'{experiment.name}' has {len(variables)} variable(s) and produces {current} task(s):")
+            for var in variables:
+                print(f"    {var.name} = {str(var.values)}, len = {len(var.values)}")
+        
         # Display clusters
+
+        print(colors.white("\n --- Clusters --- \n"))
 
         total_nodes = 0
         total_workers = 0
@@ -448,30 +450,45 @@ class GridExec():
 
         for cluster in clusters:
             total_nodes += len(cluster.nodes)
-            print(f"\tCluster '{cluster.name}' has {len(cluster.nodes)} worker(s)")
+            print(f"'{cluster.name}' has {len(cluster.nodes)} node(s):")
 
             for node in cluster.nodes:
                 total_workers += node.workers
-                print(f"\tNode '{node.name}' has {node.workers} worker(s)")
+                print(f"    '{node.name}' has {node.workers} worker(s)")
         
-        print(f"Total number of clusters: {len(clusters)}")
-        print(f"Total number of nodes: {total_nodes}")
-        print(f"Total number of workers: {total_workers}")
+        # Display total numbers and estimations
 
-        # Display estimations
+        print(colors.white("\n --- Overview --- \n"))
+
+        print(f"Redo:          {self.redo_tasks}")
+        print(f"Task filters:  {self.task_filters}")
+        print(f"Node filters:  {self.node_filters}")
+        print(f"Output folder: {self.output_folder}")
+        print(f"Recreate:      {self.recreate}")
+
+        print()
+
+        print(f"Total number of clusters: {len(clusters)}")
+        print(f"Total number of nodes:    {total_nodes}")
+        print(f"Total number of workers:  {total_workers}")
+        print(f"Total number of tasks:    {total_tasks}")
+
+        print()
 
         print('Estimated time to complete if each task takes:')
-        print(f"\tOne second: { estimate(total_tasks, total_workers,        1) }")
-        print(f"\tOne minute: { estimate(total_tasks, total_workers,       60) }")
-        print(f"\tOne hour:   { estimate(total_tasks, total_workers,    60*60) }")
-        print(f"\tOne day:    { estimate(total_tasks, total_workers, 60*60*24) }")
+        print(f"    One second: { estimate(total_tasks, total_workers,        1) }")
+        print(f"    One minute: { estimate(total_tasks, total_workers,       60) }")
+        print(f"    One hour:   { estimate(total_tasks, total_workers,    60*60) }")
+        print(f"    One day:    { estimate(total_tasks, total_workers, 60*60*24) }")
+
+        print()
 
         # Confirm
 
         if not confirmed:
             try:
                 while True:
-                    option = input('Continue [Yn]?:').strip()
+                    option = input('Do you want to continue? [Y/n] ').strip()
                     if option in ['Y', 'y', '']:
                         break
                     elif option in ['N', 'n']:
@@ -487,7 +504,7 @@ class GridExec():
 
         key = hashlib.md5()
 
-        key.update(str(self.experiments).encode())
+        key.update(str(format_as_dict(self.experiments)).encode())
 
         signature = base64.b64encode(key.digest()).decode("utf-8")
 
@@ -495,12 +512,12 @@ class GridExec():
 
         info = {
             "output_folder": self.output_folder,
-            "tasks_filter": self.task_filters,
-            "nodes_filter": self.node_filters,
-            "experiments": self.experiments,
+            "task_filters": self.task_filters,
+            "node_filters": self.node_filters,
+            "experiments": format_as_dict(self.experiments),
             "redo_tasks": self.redo_tasks,
             "recreate": self.recreate,
-            "clusters": self.clusters,
+            "clusters": format_as_dict(self.clusters),
             "signature": signature
         }
 
@@ -552,12 +569,7 @@ class GridExec():
                 "commands": e.cmd,
                 "repeat": e.repeat,
                 "max_tries": e.max_tries,
-                "variables": [
-                    { 
-                        "name": v.name,
-                        "values": v.values 
-                    } for v in e.vars
-                ]
+                "variables": {v.name:v.values for v in e.vars}
             }
 
             with open(info_filepath, "w") as fout:
@@ -577,11 +589,13 @@ class GridExec():
                     if not redo_tasks and os.path.exists(os.path.join(task_output_folder, ".done")):
                         continue
 
-                    task = Task(e.name, task_output_folder, e.workdir, experiment_idd, combination_idd, repeat_idd, task_idd, combination, e.cmd, e.max_tries)
+                    cmds = [x.format(**combination) for x in e.cmd]
+
+                    task = Task(e.name, task_output_folder, e.workdir, experiment_idd, combination_idd, repeat_idd, task_idd, combination, cmds, e.max_tries)
                     tasks.append(task)
 
         if not tasks:
-            error("No tasks to do.")
+            abort("No tasks to do.")
         
         return tasks
 
@@ -626,7 +640,7 @@ class GridExec():
                     workers.append(worker)
         
         if not workers:
-            error("No workers to work.")
+            abort("No workers to work.")
         
         return workers
 
@@ -648,6 +662,7 @@ class GridExec():
         
         # Start workers
 
+        print()
         info("Starting %d worker(s)" % len(self.workers))
 
         for worker in self.workers:
@@ -658,6 +673,8 @@ class GridExec():
         main_loop_started_at = datetime.now()
 
         try:
+
+            print()
             info("Starting main loop")
 
             while self.todo or self.doing:
@@ -693,8 +710,6 @@ class GridExec():
             print("Operation interrupted")
             return
 
-        print()
-
         main_loop_ended_at = datetime.now()
         main_loop_duration = (main_loop_ended_at - main_loop_started_at).total_seconds()
         
@@ -703,6 +718,7 @@ class GridExec():
         terminate_loop_started_at = datetime.now()
 
         try:
+            print()
             info("Releasing workers...")
 
             # Sending TERMINATE signal
@@ -747,12 +763,12 @@ class GridExec():
         
         # Display execution summary
 
-        print("\n --- Execution Summary --- \n")
-        print(f"\tTime to execute tasks: {human_time(main_loop_duration)}")
-        print(f"\tTime to terminate workers: {human_time(terminate_loop_duration)}")
-        print(f"\tTasks requested: {len(self.tasks)}")
-        print(f"\tTasks completed: {len(self.done)}")
-        print(f"\tTasks given up: {len(self.given_up)}")
+        print(colors.white("\n --- Execution Summary --- \n"))
+        print(f"    Time to execute tasks: {human_time(main_loop_duration)}")
+        print(f"    Time to terminate workers: {human_time(terminate_loop_duration)}")
+        print(f"    Tasks requested: {len(self.tasks)}")
+        print(f"    Tasks completed: {len(self.done)}")
+        print(f"    Tasks given up: {len(self.given_up)}")
         print()
 
     def _ready(self, msg_in):

@@ -86,16 +86,16 @@ def do_exec_grid(argv):
                         help="adds a machine with the given number of workers to the cluster",
                         action='append')
 
-    parser.add_argument('-v', '--verbose',
-                        dest='verbose',
-                        help="allow debug log messages to be displayed",
-                        action='store_true')
+    # parser.add_argument('-v', '--verbose',
+    #                     dest='verbose',
+    #                     help="allow debug log messages to be displayed",
+    #                     action='store_true')
 
-    parser.add_argument('-q', '--quiet',
-                        default=None,
-                        dest='quiet',
-                        help="display only warning messages and above",
-                        action='store_true')
+    # parser.add_argument('-q', '--quiet',
+    #                     default=None,
+    #                     dest='quiet',
+    #                     help="display only warning messages and above",
+    #                     action='store_true')
 
     parser.add_argument('-y',
                         dest='confirmed',
@@ -306,7 +306,7 @@ def do_exec_grid(argv):
 
     # Create the ClusterBurn
 
-    print(args)
+    # print(args)
     burn = GridExec(task_filters, args.node_filters, args.output_folder, args.redo_tasks, args.recreate, args.confirmed, experiments, clusters)
     burn.start()
 
