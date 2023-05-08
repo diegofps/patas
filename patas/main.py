@@ -27,11 +27,15 @@ def do_version(args):
 
 def do_exec_grid(argv):
     
+    # exec grid parser
+
     parser = argparse.ArgumentParser(
                         prog='patas exec grid',
                         description='Execute a program permutating its input parameters.',
                         epilog="Check the README.md to learn more tips on how to use this feature: https://github.com/diegofps/patas/blob/main/README.md",
                         formatter_class=argparse.RawDescriptionHelpFormatter)
+
+    # General parameters
 
     parser.add_argument('--cluster',
                         type=str,
@@ -158,6 +162,7 @@ def do_exec_grid(argv):
     clusters = []
 
     # If experiment parameters are provided, create an experiment for them
+
     experiment = Experiment()
 
     experiment.name = 'QuickExperiment'
@@ -199,18 +204,21 @@ def do_exec_grid(argv):
         experiments.append(experiment)
 
     # If experiment files are provided, load all of them
+
     if args.experiment:
         for filepath in args.experiment:
             experiment = load_experiment(filepath)
             experiments.append(experiment)
     
     # If cluster files are provided, we will use them
+
     if args.cluster:
         for filepath in args.cluster:
             cluster = load_cluster(filepath)
             clusters.append(cluster)
     
     # Otherwise, we will create a simple one for the local machine
+
     else:
 
         node = Node()
@@ -223,6 +231,7 @@ def do_exec_grid(argv):
         cluster.nodes.append(node)
 
     # Prepare the tasks_filter
+
     tasks_filter = []
 
     for task in args.tasks_filter:
@@ -246,6 +255,7 @@ def do_exec_grid(argv):
             error(f'Invalid --task-filter: {task}')
 
     # Create the ClusterBurn
+
     print(args)
     burn = ClusterBurn(tasks_filter, args.nodes_filter, args.output_folder, args.redo_tasks, args.recreate, experiments, clusters)
     burn.start()

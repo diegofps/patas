@@ -393,13 +393,13 @@ class WorkerProcess:
 
 class ClusterBurn():
 
-    def __init__(self, tasks_filter, nodes_filter, 
+    def __init__(self, task_filters, node_filters, 
             output_dir, redo_tasks, recreate, 
             experiments, clusters):
 
         self.output_folder = expand_path(output_dir)
-        self.tasks_filter = tasks_filter
-        self.nodes_filter = nodes_filter
+        self.task_filters = task_filters
+        self.node_filters = node_filters
         self.experiments = experiments
         self.redo_tasks = redo_tasks
         self.recreate = recreate
@@ -411,8 +411,8 @@ class ClusterBurn():
 
         self._summary(self.experiments, self.clusters)
         self._validate_signature()
-        self.tasks = self._create_tasks()
-        self.workers = self._create_workers()
+        self.tasks = self._create_tasks(self.experiments, self.output_folder, self.repeat, self.redo_tasks, self.task_filters)
+        self.workers = self._create_workers(self.clusters, self.node_filters)
         self._burn()
 
 
@@ -466,8 +466,8 @@ class ClusterBurn():
         signature = base64.b64encode(key.digest()).decode("utf-8")
 
         self.output_folder
-        self.tasks_filter
-        self.nodes_filter
+        self.task_filters
+        self.node_filters
         self.experiments
         self.redo_tasks
         self.recreate
@@ -475,8 +475,8 @@ class ClusterBurn():
 
         info = {
             "output_folder": self.output_folder,
-            "tasks_filter": self.tasks_filter,
-            "nodes_filter": self.nodes_filter,
+            "tasks_filter": self.task_filters,
+            "nodes_filter": self.node_filters,
             "experiments": self.experiments,
             "redo_tasks": self.redo_tasks,
             "recreate": self.recreate,
@@ -502,7 +502,7 @@ class ClusterBurn():
             yaml.dump(info, fout, default_flow_style=False)
 
 
-    def _create_tasks(self, experiments, output_folder, repeat, redo_tasks, tasks_filter):
+    def _create_tasks(self, experiments, output_folder, repeat, redo_tasks, task_filters):
 
         print("Creating tasks...")
 
@@ -544,7 +544,7 @@ class ClusterBurn():
                 for repeat_idd in range(repeat):
                     task_idd += 1
 
-                    if tasks_filter and not any(a <= task_idd < b for a, b in tasks_filter):
+                    if task_filters and not any(a <= task_idd < b for a, b in task_filters):
                         continue
 
                     task_output_folder = os.path.join(experiment_filepath, str(task_idd))
@@ -556,14 +556,14 @@ class ClusterBurn():
                     tasks.append(task)
 
         if not tasks:
-            error("No tasks to do")
+            error("No tasks to do.")
         
         return tasks
 
 
-    def _create_workers(self, clusters):
+    def _create_workers(self, clusters, node_filters):
 
-        print("Starting cluster...")
+        print("Creating workers...")
 
         cluster_idd = -1
         worker_idd = -1
@@ -583,6 +583,9 @@ class ClusterBurn():
                 for _ in range(node.workers):
                     worker_idd += 1
 
+                    if node_filters and not any(all(tag in node.tags for tag in filter) for filter in node_filters):
+                        continue
+
                     builder = ExecutorBuilder(SSHExecutor, node)
 
                     env_variables = {
@@ -596,6 +599,9 @@ class ClusterBurn():
 
                     worker = WorkerProcess(worker_idd, builder, env_variables)
                     workers.append(worker)
+        
+        if not workers:
+            error("No workers to work.")
         
         return workers
 
@@ -615,12 +621,14 @@ class ClusterBurn():
         len_workers = len(str(len(self.workers)))
         
 
-        # Start loop
+        # Start workers
+
         info("Starting %d worker(s)" % len(self.workers))
         for worker in self.workers:
             worker.start(self.queue)
 
         # Main loop
+
         try:
             info("Starting main loop")
             while self.todo or self.doing:
@@ -659,15 +667,19 @@ class ClusterBurn():
 
         print()
 
-        # Ending loop
+        # Terminate workers
+
         try:
             info("Terminating workers...")
+
             # Sending TERM signal
+
             for worker in self.workers:
                 msg = QueueMsg("terminate")
                 worker.queue.put(msg)
             
             # Waiting for ENDED signal
+
             while len(self.workers) != len(self.ended):
                 msg = self.queue.get()
 
@@ -688,13 +700,14 @@ class ClusterBurn():
                     #debug("Ignoring action %s from %s, execution is ending" % (msg.source, msg.action))
                     pass
 
-            info("Terminated")
+            info("All workers are resting.")
         except KeyboardInterrupt:
             print("Operation interrupted")
             return
 
 
     def _ready(self, msg_in):
+
         if self.todo:
             msg_out = QueueMsg("execute")
             msg_out.task = self.todo.pop()
@@ -709,6 +722,7 @@ class ClusterBurn():
 
 
     def _finished(self, msg_in):
+
         for i, x in enumerate(self.doing):
             if x.assigned_to == msg_in.source:
                 break
@@ -738,6 +752,6 @@ class ClusterBurn():
         msg_out = QueueMsg("execute")
         msg_out.task = task
         msg_out.task.assigned_to = target
-        msg_out.task.tries += 1
+        msg_out.task.tries += 1 # TODO: Check this. It may be counting more than necessary
 
         self.workers[target].queue.put(msg_out)
