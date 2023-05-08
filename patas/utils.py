@@ -322,4 +322,42 @@ def clean_folder(folderpath):
             os.remove(folderpath)
     else:
         os.makedirs(folderpath, exist_ok=True)
+
+
+def human_time(seconds):
+
+    v = seconds
+
+    if v < 60:
+        return f"{v} seconds"
+    v /= 60
+
+    if v < 60:
+        return f"{v} minutes"
+    v /= 60
+
+    if v < 24:
+        return f"{v} hours"
+    v /= 24
+
+    if v < 7:
+        return f"{v} days"
+    v /= 7
+
+    if v < 52:
+        return f"{v} weeks ~ {v / 4.0} months"
+    v /= 52
+
+    if v < 100:
+        return f"{v} years"
+    v /= 100
+
+    if v < 10:
+        return f"{v} centuries"
+    v /= 10
+
+    return f"{v} milleniums"
+
+def estimate(tasks, workers, seconds):
     
+    return human_time(tasks / workers * seconds)

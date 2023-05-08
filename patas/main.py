@@ -6,7 +6,7 @@ except:
     from patas import consts as c
 
 from .schemas import Cluster, Experiment, Node, ListVariable, ArithmeticVariable, GeometricVariable, load_cluster, load_experiment
-from .cluster_burn import ClusterBurn
+from .cluster_burn import GridExec
 from .utils import error
 
 from multiprocessing import cpu_count
@@ -85,7 +85,6 @@ def do_exec_grid(argv):
                         action='append')
 
     parser.add_argument('-v', '--verbose',
-                        default=None,
                         dest='verbose',
                         help="allow debug log messages to be displayed",
                         action='store_true')
@@ -94,6 +93,11 @@ def do_exec_grid(argv):
                         default=None,
                         dest='quiet',
                         help="display only warning messages and above",
+                        action='store_true')
+
+    parser.add_argument('-y',
+                        dest='confirmed',
+                        help="skip confirmation before starting the tasks",
                         action='store_true')
 
     parser.add_argument('-o',
@@ -141,6 +145,13 @@ def do_exec_grid(argv):
                         help="number of times that each combination must be executed",
                         action='store')
 
+    parser.add_argument('--max-tries',
+                        type=int,
+                        metavar='T',
+                        dest='max_tries',
+                        help="maximum number of retries after a task has failed",
+                        action='store')
+
     parser.add_argument('--workdir',
                         type=str,
                         metavar='W',
@@ -175,6 +186,9 @@ def do_exec_grid(argv):
     
     if args.cmd:
         experiment.cmd = args.cmd
+
+    if args.max_tries:
+        experiment.max_tries = args.max_tries
 
     for values in args.var_list:
         var = ListVariable()
@@ -257,7 +271,7 @@ def do_exec_grid(argv):
     # Create the ClusterBurn
 
     print(args)
-    burn = ClusterBurn(tasks_filter, args.nodes_filter, args.output_folder, args.redo_tasks, args.recreate, experiments, clusters)
+    burn = GridExec(tasks_filter, args.nodes_filter, args.output_folder, args.redo_tasks, args.recreate, args.confirmed, experiments, clusters)
     burn.start()
 
 def do_parse(args):

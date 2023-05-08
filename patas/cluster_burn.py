@@ -1,4 +1,4 @@
-from .utils import expand_path, error, warn, info, debug, critical, readlines, clean_folder, colors
+from .utils import expand_path, error, warn, info, debug, critical, readlines, clean_folder, estimate, human_time, colors
 from .schemas import Experiment, Cluster, Node
 
 from multiprocessing import Process, Queue
@@ -17,23 +17,17 @@ import pty
 import sys
 import os
 
-# Print a signature after entering ssh and after disconnecting
-# ssh -t wup@172.17.0.3 "echo 12345 ; bash" ; echo '54321'
 
-# Print output code of last command
-# echo $?
-
-KEY_SSH_ON = b'74ffc7c4-a6ad-4315-94cb-59d045a230c0'
+KEY_SSH_ON  = b'74ffc7c4-a6ad-4315-94cb-59d045a230c0'
 KEY_SSH_OFF = b'93dfc971-fa64-4beb-a24e-d8874738b9ca'
-KEY_CMD_ON = b'15e6896c-3ea7-42a0-aa32-23e2ab3c0e12'
+KEY_CMD_ON  = b'15e6896c-3ea7-42a0-aa32-23e2ab3c0e12'
 KEY_CMD_OFF = b'e04a4348-8092-46a6-8e0c-d30d10c86fb3'
-KEY_OUTPUT_CODE = b'2a25b3bf-efd5-4d38-81dd-1065c683ec85'
 
 echo = lambda x: b" echo -e \"%s\"" % x.replace(b"-", b"-\b-")
 
-ECHO_SSH_ON = echo(KEY_SSH_ON)
+ECHO_SSH_ON  = echo(KEY_SSH_ON)
 ECHO_SSH_OFF = echo(KEY_SSH_OFF)
-ECHO_CMD_ON = echo(KEY_CMD_ON)
+ECHO_CMD_ON  = echo(KEY_CMD_ON)
 ECHO_CMD_OFF = b" echo -en \"\n $? %s\"" % KEY_CMD_OFF.replace(b"-", b"-\b-")
 
 
@@ -79,13 +73,14 @@ class Task:
 
     def __init__(self, 
             experiment_name, task_output_dir, work_dir, experiment_idd, perm_idd, 
-            repeat_idd, task_idd, combination, cmdlines):
+            repeat_idd, task_idd, combination, cmdlines, max_tries):
 
         self.experiment_name = experiment_name
         self.experiment_idd = experiment_idd
         self.output_dir = task_output_dir
         self.combination = combination
         self.repeat_idd = repeat_idd
+        self.max_tries = max_tries
         self.work_dir = work_dir
         self.perm_idd = perm_idd
         self.task_idd = task_idd
@@ -108,12 +103,12 @@ class Task:
 
 class ExecutorBuilder:
 
-    def __init__(self, connector, machine):
-        self.connector = connector
-        self.machine = machine
+    def __init__(self, executor_type, node):
+        self.executor_type = executor_type
+        self.node = node
 
     def __call__(self):
-        return self.connector(self.machine)
+        return self.executor_type(self.node)
 
 
 class BashExecutor:
@@ -124,7 +119,6 @@ class SSHExecutor:
 
     def __init__(self, node):
 
-        #self.ssh = BasicSSH(machine.user, machine.ip, machine.ip)
         self.node = node
         self.is_alive = False
 
@@ -161,6 +155,7 @@ class SSHExecutor:
 
 
     def _start_bash(self):
+
         debug("Starting bash")
 
         self.popen = Popen(
@@ -173,6 +168,7 @@ class SSHExecutor:
 
 
     def _connect(self):
+
         conn_try = 1
 
         while True:
@@ -218,6 +214,7 @@ class SSHExecutor:
 
 
     def execute(self, initrc, cmds):
+
         if type(cmds) is not list:
             cmds = [cmds]
 
@@ -270,9 +267,9 @@ class SSHExecutor:
 
 class WorkerProcess:
 
-    def __init__(self, worker_idd, connection_builder, env_variables):
+    def __init__(self, worker_idd, executor_builder, env_variables):
 
-        self.connection_builder = connection_builder
+        self.executor_builder = executor_builder
         self.env_variables = env_variables
         self.worker_idd = worker_idd
         self.process = None
@@ -280,18 +277,20 @@ class WorkerProcess:
 
 
     def start(self, queue_master):
+
         self.queue = Queue()
         self.process = Process(target=self.run, args=(self.queue, queue_master))
         self.process.start()
 
 
-    def debug(self, *args):
-        debug(self.worker_idd, "|", *args)
+    # def debug(self, *args):
+    #     debug(self.worker_idd, "|", *args)
 
 
     def run(self, queue_in, queue_master):
+
         try:
-            conn = self.connection_builder()
+            executor = self.executor_builder()
 
             msg_out = QueueMsg("ready", self.worker_idd)
             queue_master.put(msg_out)
@@ -300,15 +299,14 @@ class WorkerProcess:
                 msg_in = queue_in.get()
 
                 if msg_in.action == "execute":
-                    #self.debug("Starting execute")
-                    success = self.execute(msg_in, conn)
+                    success = self.execute(msg_in, executor)
 
                     msg_out = QueueMsg("finished", self.worker_idd)
                     msg_out.success = success
                     queue_master.put(msg_out)
 
-                    if not conn.is_alive:
-                        conn = self.connection_builder()
+                    if not executor.is_alive:
+                        executor = self.executor_builder()
 
                     msg_out = QueueMsg("ready", self.worker_idd)
                     queue_master.put(msg_out)
@@ -325,7 +323,7 @@ class WorkerProcess:
             pass
 
 
-    def execute(self, msg_in, conn):
+    def execute(self, msg_in, executor):
 
         task:Task = msg_in.task
 
@@ -347,7 +345,7 @@ class WorkerProcess:
         # Execute this task
 
         task.started_at = datetime.now()
-        task.success, task.output, task.status = conn.execute(initrc, cmdline)
+        task.success, task.output, task.status = executor.execute(initrc, cmdline)
         task.ended_at = datetime.now()
         task.duration = (task.ended_at - task.started_at).total_seconds()
 
@@ -391,10 +389,10 @@ class WorkerProcess:
         return task.success
 
 
-class ClusterBurn():
+class GridExec():
 
     def __init__(self, task_filters, node_filters, 
-            output_dir, redo_tasks, recreate, 
+            output_dir, redo_tasks, recreate, confirmed,
             experiments, clusters):
 
         self.output_folder = expand_path(output_dir)
@@ -402,23 +400,26 @@ class ClusterBurn():
         self.node_filters = node_filters
         self.experiments = experiments
         self.redo_tasks = redo_tasks
+        self.confirmed = confirmed
         self.recreate = recreate
         self.clusters = clusters
 
 
     def start(self):
+
         os.makedirs(self.output_folder, exist_ok=True)
 
-        self._summary(self.experiments, self.clusters)
-        self._validate_signature()
-        self.tasks = self._create_tasks(self.experiments, self.output_folder, self.repeat, self.redo_tasks, self.task_filters)
+        self._show_summary(self.experiments, self.clusters, self.confirmed)
+        self._write_signature()
+        self.tasks = self._create_tasks(self.experiments, self.output_folder, self.redo_tasks, self.task_filters)
         self.workers = self._create_workers(self.clusters, self.node_filters)
-        self._burn()
+        self._exec()
 
 
-    def _summary(self, experiments, clusters):
+    def _show_summary(self, experiments, clusters, confirmed):
 
         # Display experiments
+
         total_tasks = 0
         experiment: Experiment
 
@@ -439,6 +440,7 @@ class ClusterBurn():
         print(f"Total number of tasks: {total_tasks}")
 
         # Display clusters
+
         total_nodes = 0
         total_workers = 0
         node:Node = None
@@ -456,8 +458,32 @@ class ClusterBurn():
         print(f"Total number of nodes: {total_nodes}")
         print(f"Total number of workers: {total_workers}")
 
+        # Display estimations
 
-    def _validate_signature(self):
+        print('Estimated time to complete if each task takes:')
+        print(f"\tOne second: { estimate(total_tasks, total_workers,        1) }")
+        print(f"\tOne minute: { estimate(total_tasks, total_workers,       60) }")
+        print(f"\tOne hour:   { estimate(total_tasks, total_workers,    60*60) }")
+        print(f"\tOne day:    { estimate(total_tasks, total_workers, 60*60*24) }")
+
+        # Confirm
+
+        if not confirmed:
+            try:
+                while True:
+                    option = input('Continue [Yn]?:').strip()
+                    if option in ['Y', 'y', '']:
+                        break
+                    elif option in ['N', 'n']:
+                        sys.exit(0)
+                    else:
+                        print('Invalid option')
+            except KeyboardInterrupt:
+                sys.exit(0)
+
+    def _write_signature(self):
+
+        # Calculate the signature for the received configuration
 
         key = hashlib.md5()
 
@@ -465,13 +491,7 @@ class ClusterBurn():
 
         signature = base64.b64encode(key.digest()).decode("utf-8")
 
-        self.output_folder
-        self.task_filters
-        self.node_filters
-        self.experiments
-        self.redo_tasks
-        self.recreate
-        self.clusters
+        # Data to be saved into the signature file
 
         info = {
             "output_folder": self.output_folder,
@@ -484,6 +504,8 @@ class ClusterBurn():
             "signature": signature
         }
 
+        # Load the previous signature file, if it exists
+
         info_filepath = os.path.join(self.output_folder, "info.yml")
 
         try:
@@ -492,24 +514,27 @@ class ClusterBurn():
         except:
             other = None
 
+        # If the previous file was loaded and it has a signature, compare it to the current signature
+
         if other and "signature" in other and other["signature"] != signature:
             if self.recreate:
                 clean_folder(self.output_folder)
             else:
                 error("The output folder contains a different output configuration. Provide an empty folder or add the parameter --recreate to overwrite this one")
+
+        # Write the new signature file
             
         with open(info_filepath, "w") as fout:
             yaml.dump(info, fout, default_flow_style=False)
 
 
-    def _create_tasks(self, experiments, output_folder, repeat, redo_tasks, task_filters):
+    def _create_tasks(self, experiments, output_folder, redo_tasks, task_filters):
 
         print("Creating tasks...")
 
         e:Experiment = None
         combination_idd = -1
         experiment_idd = -1
-        #run_idd = -1
         task_idd = -1
         tasks = []
 
@@ -541,7 +566,7 @@ class ClusterBurn():
             for combination in combine_variables(e.vars):
                 combination_idd += 1
 
-                for repeat_idd in range(repeat):
+                for repeat_idd in range(e.repeat):
                     task_idd += 1
 
                     if task_filters and not any(a <= task_idd < b for a, b in task_filters):
@@ -552,7 +577,7 @@ class ClusterBurn():
                     if not redo_tasks and os.path.exists(os.path.join(task_output_folder, ".done")):
                         continue
 
-                    task = Task(e.name, task_output_folder, e.workdir, experiment_idd, combination_idd, repeat_idd, task_idd, combination, e.cmd)
+                    task = Task(e.name, task_output_folder, e.workdir, experiment_idd, combination_idd, repeat_idd, task_idd, combination, e.cmd, e.max_tries)
                     tasks.append(task)
 
         if not tasks:
@@ -606,32 +631,37 @@ class ClusterBurn():
         return workers
 
 
-    def _burn(self):
-        self.queue = Queue()
+    def _exec(self):
 
-        self.todo = copy.copy(self.tasks)
-        self.doing = []
-        self.done = []
+        self.queue    = Queue()
+
+        self.todo     = copy.copy(self.tasks)
+        self.doing    = []
+        self.done     = []
         self.given_up = []
 
-        self.idle = []
-        self.ended = []
+        self.idle     = []
+        self.ended    = []
 
-        len_todo = len(str(len(self.todo)))
-        len_workers = len(str(len(self.workers)))
+        len_todo      = len(str(len(self.todo)))
+        len_workers   = len(str(len(self.workers)))
         
-
         # Start workers
 
         info("Starting %d worker(s)" % len(self.workers))
+
         for worker in self.workers:
             worker.start(self.queue)
 
         # Main loop
 
+        main_loop_started_at = datetime.now()
+
         try:
             info("Starting main loop")
+
             while self.todo or self.doing:
+
                 msg_in = self.queue.get()
 
                 l1 = str(len(self.todo    ))
@@ -645,11 +675,7 @@ class ClusterBurn():
                 l3 = colors.green(" " * (len_todo    - len(l3)) + l3 + " |")
                 l4 = colors.red  (" " * (len_todo    - len(l4)) + l4 + " |")
 
-                msg = "%s %s %s %s %s" % (d, l1, l2, l3, l4)
-                print(msg)
-
-                #info("|MASTER| Status %d/%d/%d" % (len(self.todo), len(self.doing), len(self.done)))
-                #info("|MASTER| Message %s from %d" % (msg_in.action, msg_in.source))
+                print(f"{d} {l1} {l2} {l3} {l4}")
 
                 if msg_in.action == "ready":
                     self._ready(msg_in)
@@ -660,19 +686,26 @@ class ClusterBurn():
                 else:
                     warn("Unknown action:", msg_in.action)
             
-            info("Completed")
+            info("Main loop completed")
+
         except KeyboardInterrupt:
+
             print("Operation interrupted")
             return
 
         print()
 
+        main_loop_ended_at = datetime.now()
+        main_loop_duration = (main_loop_ended_at - main_loop_started_at).total_seconds()
+        
         # Terminate workers
 
-        try:
-            info("Terminating workers...")
+        terminate_loop_started_at = datetime.now()
 
-            # Sending TERM signal
+        try:
+            info("Releasing workers...")
+
+            # Sending TERMINATE signal
 
             for worker in self.workers:
                 msg = QueueMsg("terminate")
@@ -681,9 +714,11 @@ class ClusterBurn():
             # Waiting for ENDED signal
 
             while len(self.workers) != len(self.ended):
+
                 msg = self.queue.get()
 
                 if msg.action == "ended":
+
                     self.ended.append(msg.source)
 
                     d = colors.gray("|%s|" % str(datetime.now()))
@@ -701,10 +736,24 @@ class ClusterBurn():
                     pass
 
             info("All workers are resting.")
+            
         except KeyboardInterrupt:
+
             print("Operation interrupted")
             return
 
+        terminate_loop_ended_at = datetime.now()
+        terminate_loop_duration = (terminate_loop_ended_at - terminate_loop_started_at).total_seconds()
+        
+        # Display execution summary
+
+        print("\n --- Execution Summary --- \n")
+        print(f"\tTime to execute tasks: {human_time(main_loop_duration)}")
+        print(f"\tTime to terminate workers: {human_time(terminate_loop_duration)}")
+        print(f"\tTasks requested: {len(self.tasks)}")
+        print(f"\tTasks completed: {len(self.done)}")
+        print(f"\tTasks given up: {len(self.given_up)}")
+        print()
 
     def _ready(self, msg_in):
 
@@ -712,7 +761,6 @@ class ClusterBurn():
             msg_out = QueueMsg("execute")
             msg_out.task = self.todo.pop()
             msg_out.task.assigned_to = msg_in.source
-            msg_out.task.tries += 1
 
             self.doing.append(msg_out.task)
             self.workers[msg_in.source].queue.put(msg_out)
@@ -733,13 +781,14 @@ class ClusterBurn():
         
         task:Task = self.doing[i]
         del self.doing[i]
+        task.tries += 1
 
         if msg_in.success:
             self.done.append(task)
             return
 
-        if task.tries >= 3:
-            warn("Giving up on task %d too many fails" % task.task_idd)
+        if task.tries >= task.max_tries:
+            warn(f"Giving up on task {task.task_idd}, too many fails")
             self.given_up.append(task)
             return
         
@@ -752,6 +801,5 @@ class ClusterBurn():
         msg_out = QueueMsg("execute")
         msg_out.task = task
         msg_out.task.assigned_to = target
-        msg_out.task.tries += 1 # TODO: Check this. It may be counting more than necessary
 
         self.workers[target].queue.put(msg_out)
