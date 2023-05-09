@@ -316,7 +316,7 @@ def do_parse(argv):
 
     # General parameters
 
-    parser.add_argument('-i',
+    parser.add_argument('-e',
                         type=str,
                         metavar='FOLDERPATH',
                         dest='experiment_folder',
@@ -348,11 +348,6 @@ def do_parse(argv):
                         help="emit a line break in the output csv",
                         action='append')
 
-    parser.add_argument('-v',
-                        dest='verbose',
-                        help="include extra columns in the output file",
-                        action='store_true')
-
     args = parser.parse_args(args=argv)
 
     # Convert the input values from '-p' and '-n' into Pattern objects
@@ -362,7 +357,7 @@ def do_parse(argv):
 
     # Parse the folder and generate the output file
 
-    parser = ExperimentParser(patterns, linebreakers, args.verbose)
+    parser = ExperimentParser(patterns, linebreakers, True)
     parser.start(args.experiment_folder, args.output_file)
 
 
