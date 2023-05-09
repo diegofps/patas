@@ -1,5 +1,5 @@
 
-import mell.consts as c
+import patas.consts as c
 import setuptools
 
 
