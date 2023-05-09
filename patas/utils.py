@@ -252,7 +252,8 @@ def run(cmds, write=None, read=False, suppressInterruption=False, suppressError=
 
 def abort(*args):
     if args:
-        print(*args, file=sys.stderr)
+        msg = colors.PURPLE + ' '.join([str(x) for x in args]) + colors.RESET
+        print(msg, file=sys.stderr)
     exit(1)
 
 
@@ -264,22 +265,18 @@ def error(*args):
 
 
 def critical(*args):
-    #rprint("|CRITICAL|", *args)
     print(colors.RED + "|CRITICAL| " + " ".join([str(v) for v in args]) + colors.RESET)
 
 
 def warn(*args):
-    #yprint("|WARNING|", *args)
     print(colors.YELLOW + "|WARNING| " + " ".join([str(v) for v in args]) + colors.RESET)
 
 
 def info(*args):
-    #gprint("|INFO|", *args)
     print(colors.GREEN + "|INFO| " + " ".join([str(v) for v in args]) + colors.RESET)
 
 
 def debug(*args):
-    #cprint("|DEBUG|", *args)
     print(colors.CYAN + "|DEBUG| " + " ".join([str(v) for v in args]) + colors.RESET)
 
 
@@ -325,6 +322,8 @@ def clean_folder(folderpath):
 
 
 def human_time(seconds):
+
+    import pdb; pdb.set_trace()
 
     v = seconds
 

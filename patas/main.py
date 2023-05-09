@@ -6,6 +6,7 @@ except:
     from patas import consts as c
 
 from patas.schemas import Cluster, Experiment, Node, ListVariable, ArithmeticVariable, GeometricVariable, load_cluster, load_experiment
+from patas.parse import ExperimentParser, Pattern
 from patas.grid_exec import GridExec
 from patas.utils import error
 
@@ -21,13 +22,13 @@ def show_main_syntax():
 
 def show_exec_syntax():
     print("Syntax: patas exec [grid] {ARGS}")
- 
+
 def do_version(args):
     print(f"Patas {c.version}")
 
 def do_exec_grid(argv):
     
-    # exec grid parser
+    # argparse for 'patas exec grid'
 
     parser = argparse.ArgumentParser(
                         prog='patas exec grid',
@@ -86,17 +87,6 @@ def do_exec_grid(argv):
                         help="adds a machine with the given number of workers to the cluster",
                         action='append')
 
-    # parser.add_argument('-v', '--verbose',
-    #                     dest='verbose',
-    #                     help="allow debug log messages to be displayed",
-    #                     action='store_true')
-
-    # parser.add_argument('-q', '--quiet',
-    #                     default=None,
-    #                     dest='quiet',
-    #                     help="display only warning messages and above",
-    #                     action='store_true')
-
     parser.add_argument('-y',
                         dest='confirmed',
                         help="skip confirmation before starting the tasks",
@@ -109,7 +99,6 @@ def do_exec_grid(argv):
                         dest='output_folder',
                         help="folder to store the program outputs",
                         action='store')
-
 
     # Quick Experiment parameters
 
@@ -179,7 +168,7 @@ def do_exec_grid(argv):
 
     experiment = Experiment()
 
-    experiment.name = 'QuickExperiment'
+    experiment.name = 'quick_experiment'
 
     if args.repeat:
         experiment.repeat = args.repeat
@@ -240,7 +229,7 @@ def do_exec_grid(argv):
     if args.node:
         
         cluster = Cluster()
-        cluster.name = 'QuickCluster'
+        cluster.name = 'quick_cluster'
         clusters.append(cluster)
 
         for i, node_params in enumerate(args.node):
@@ -269,12 +258,12 @@ def do_exec_grid(argv):
     if not clusters:
 
         node          = Node()
-        node.name     = 'LocalMachine'
+        node.name     = 'local_machine'
         node.hostname = 'localhost'
         node.workers  = cpu_count()
 
         cluster       = Cluster()
-        cluster.name  = 'QuickCluster'
+        cluster.name  = 'quick_cluster'
 
         cluster.nodes.append(node)
 
@@ -304,14 +293,68 @@ def do_exec_grid(argv):
         except ValueError:
             error(f'Invalid --task-filter: {task}')
 
-    # Create the ClusterBurn
+    # Create and run GridExec
 
-    # print(args)
     burn = GridExec(task_filters, args.node_filters, args.output_folder, args.redo_tasks, args.recreate, args.confirmed, experiments, clusters)
     burn.start()
 
-def do_parse(args):
-    raise NotImplementedError("parse is not implemented yet.")
+def do_parse(argv):
+    
+    # argparse for 'patas parse'
+
+    parser = argparse.ArgumentParser(
+                        prog='patas parse',
+                        description='Parse the output files from patas exec and generate a summary in csv',
+                        epilog="Check the README.md to learn more tips on how to use this feature: https://github.com/diegofps/patas/blob/main/README.md",
+                        formatter_class=argparse.RawDescriptionHelpFormatter)
+
+    # General parameters
+
+    parser.add_argument('-i',
+                        type=str,
+                        metavar='FOLDERPATH',
+                        dest='experiment_folder',
+                        required=True,
+                        help="path to the experiment folder that must be parsed",
+                        action='store')
+
+    parser.add_argument('-o',
+                        type=str,
+                        metavar='FILEPATH',
+                        dest='output_file',
+                        help="path to the output csv file",
+                        action='store')
+
+    parser.add_argument('-p',
+                        type=str,
+                        metavar=('OUT_NAME', 'REGEX'),
+                        default=[],
+                        nargs=2,
+                        dest='patterns',
+                        help="regex containing a single group capture indicating the data that must be captured",
+                        action='append')
+
+    parser.add_argument('-n',
+                        type=str,
+                        metavar='REGEX',
+                        default=[],
+                        dest='linebreakers',
+                        help="emit a line break in the output csv",
+                        action='append')
+
+    args = parser.parse_args(args=argv)
+
+    # Convert the input values from '-p' and '-n' into Pattern objects
+
+    patterns     = [Pattern(name, pattern) for name, pattern in args.patterns]
+    linebreakers = [Pattern(None, pattern) for pattern in args.linebreakers]
+
+    # Parse the folder and generate the output file
+
+    parser = ExperimentParser(patterns, linebreakers)
+    parser.start(args.experiment_folder, args.output_file)
+
+
 
 def do_doctor(args):
     raise NotImplementedError("doctor is not implemented yet.")

@@ -535,9 +535,10 @@ class GridExec():
 
         if other and "signature" in other and other["signature"] != signature:
             if self.recreate:
+                print("Recreating output folder...")
                 clean_folder(self.output_folder)
             else:
-                error("The output folder contains a different output configuration. Provide an empty folder or add the parameter --recreate to overwrite this one")
+                abort("The output folder contains a different output configuration. Provide an empty folder or add the parameter --recreate to overwrite this one")
 
         # Write the new signature file
             
@@ -559,7 +560,7 @@ class GridExec():
 
             experiment_idd += 1
 
-            experiment_filepath = os.path.join(output_folder, "experiments", e.name)
+            experiment_filepath = os.path.join(output_folder, e.name)
             info_filepath = os.path.join(experiment_filepath, "info.yml")
             os.makedirs(experiment_filepath, exist_ok=True)
 
@@ -667,6 +668,8 @@ class GridExec():
 
         for worker in self.workers:
             worker.start(self.queue)
+        
+        info("Worker(s) started")
 
         # Main loop
 
