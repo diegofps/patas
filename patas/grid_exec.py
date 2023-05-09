@@ -1,15 +1,14 @@
-from .utils import expand_path, error, warn, info, debug, critical, abort, readlines, clean_folder, estimate, human_time, colors
+from .utils import expand_path, error, warn, info, debug, critical, abort, readlines, clean_folder, estimate, human_time, quote, colors
 from .schemas import Experiment, Cluster, Node, format_as_dict
 
 from multiprocessing import Process, Queue
+from subprocess import Popen, PIPE
 from datetime import datetime
-from subprocess import Popen
 
 import hashlib
 import base64
 import select
 import shlex
-import uuid
 import copy
 import time
 import yaml
@@ -72,19 +71,19 @@ class QueueMsg(dict):
 class Task:
 
     def __init__(self, 
-            experiment_name, task_output_dir, work_dir, experiment_idd, perm_idd, 
+            experiment_name, task_output_dir, work_dir, experiment_idd, combination_idd, 
             repeat_idd, task_idd, combination, cmdlines, max_tries):
 
         self.experiment_name = experiment_name
+        self.combination_idd = combination_idd
         self.experiment_idd = experiment_idd
         self.output_dir = task_output_dir
         self.combination = combination
         self.repeat_idd = repeat_idd
         self.max_tries = max_tries
         self.work_dir = work_dir
-        self.perm_idd = perm_idd
         self.task_idd = task_idd
-        self.cmdlines = cmdlines
+        self.commands = cmdlines
         self.assigned_to = None
         self.started_at = None
         self.ended_at = None
@@ -97,8 +96,8 @@ class Task:
     
     def __repr__(self):
         comb = ";".join(f"{k}={v}" for k, v in self.combination.items())
-        return "%d %d %d %d %s %s" % (self.experiment_idd, self.perm_idd, 
-                    self.repeat_idd, self.task_idd, comb, self.cmdlines)
+        return "%d %d %d %d %s %s" % (self.experiment_idd, self.combination_idd, 
+                    self.repeat_idd, self.task_idd, comb, self.commands)
 
 
 class ExecutorBuilder:
@@ -112,7 +111,31 @@ class ExecutorBuilder:
 
 
 class BashExecutor:
-    pass
+    
+    def __init__(self, node):
+
+        self.is_alive = True
+        self.node = node
+    
+    def execute(self, initrc, cmds):
+
+        if type(cmds) is not list:
+            cmds = [cmds]
+
+        cmds = [x + b' 2>&1 ' for x in cmds]
+
+        p1 = b" ; ".join(initrc)
+        p3 = b" ; ".join(cmds)
+
+        cmd_str = b" %s ; %s " % (p1, p3)
+        cmd_str = "bash -c " + quote(cmd_str.decode('utf-8'))
+        
+        ps = Popen(shlex.split(cmd_str), stdout=PIPE)
+
+        status = ps.wait()
+        stdout = ps.stdout
+
+        return (status == 0), stdout, status
 
 
 class SSHExecutor:
@@ -340,7 +363,7 @@ class WorkerProcess:
 
         # Prepare the command line we will execute
 
-        cmdline = " ; ".join(task.cmdlines).encode()
+        cmdline = " ; ".join(task.commands).encode()
 
         # Execute this task
 
@@ -357,10 +380,25 @@ class WorkerProcess:
             os.remove(done_filepath)
 
         # Dump task info
-
-        info = copy.copy(task.__dict__)
-        info["env_variables"] = env_variables
-        del info["output"]
+        
+        info = {
+            "task_id": task.task_idd,
+            "repeat_id": task.repeat_idd,
+            "experiment_id": task.experiment_idd,
+            "experiment_name": task.experiment_name,
+            "combination_id": task.combination_idd,
+            "combination": task.combination,
+            "started_at": task.started_at,
+            "ended_at": task.ended_at,
+            "duration": task.duration,
+            "env_variables": env_variables,
+            "max_tries": task.max_tries,
+            "tries": task.tries + 1,
+            "output_dir": task.output_dir,
+            "work_dir": task.work_dir,
+            "commands": task.commands,
+            "assigned_to": task.assigned_to,
+        }
 
         filepath = os.path.join(task.output_dir, "info.yml")
         with open(filepath, "w") as fout:
@@ -368,7 +406,7 @@ class WorkerProcess:
         
         # Dump task output
 
-        filepath = os.path.join(task.output_dir, "output.txt")
+        filepath = os.path.join(task.output_dir, "stdout")
         with open(filepath, "wb") as fout:
             fout.writelines(task.output)
 
@@ -381,10 +419,10 @@ class WorkerProcess:
         # Write output to stdout if the task failed
 
         else:
-            critical("Task %d has failed. Exit code: %s" % (task.task_idd, task.status))
+            warn("--- TASK %d FAILED WITH EXIT CODE %s ---" % (task.task_idd, task.status))
             for line in task.output:
                 os.write(sys.stdout.fileno(), line)
-            critical("--- END OF FAILED OUTPUT ---")
+            warn("--- END OF FAILED OUTPUT ---")
 
         return task.success
 
@@ -403,6 +441,8 @@ class GridExec():
         self.confirmed = confirmed
         self.recreate = recreate
         self.clusters = clusters
+        self.workers:list[WorkerProcess] = None
+        self.tasks:list[Task] = None
 
 
     def start(self):
@@ -411,7 +451,7 @@ class GridExec():
 
         self._show_summary(self.experiments, self.clusters, self.confirmed)
         self._write_signature()
-        self.tasks = self._create_tasks(self.experiments, self.output_folder, self.redo_tasks, self.task_filters)
+        self.tasks   = self._create_tasks(self.experiments, self.output_folder, self.redo_tasks, self.task_filters)
         self.workers = self._create_workers(self.clusters, self.node_filters)
         self._exec()
 
@@ -626,7 +666,10 @@ class GridExec():
                     if node_filters and not any(all(tag in node.tags for tag in filter) for filter in node_filters):
                         continue
 
-                    builder = ExecutorBuilder(SSHExecutor, node)
+                    if node.hostname in ['localhost', '127.0.0.1']:
+                        builder = ExecutorBuilder(BashExecutor, node)    
+                    else:
+                        builder = ExecutorBuilder(SSHExecutor, node)
 
                     env_variables = {
                         "PATAS_CLUSTER_NAME": cluster.name,
@@ -807,7 +850,7 @@ class GridExec():
             return
 
         if task.tries >= task.max_tries:
-            warn(f"Giving up on task {task.task_idd}, too many fails")
+            critical(f"Giving up on task {task.task_idd}, max_tries reached.")
             self.given_up.append(task)
             return
         

@@ -323,8 +323,6 @@ def clean_folder(folderpath):
 
 def human_time(seconds):
 
-    import pdb; pdb.set_trace()
-
     v = seconds
 
     if v < 60:

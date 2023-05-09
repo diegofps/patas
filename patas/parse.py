@@ -1,4 +1,4 @@
-from patas.utils import expand_path, abort
+from patas.utils import expand_path, abort, warn
 from glob import glob
 
 import yaml
@@ -53,7 +53,7 @@ class Pattern:
 
 class TaskParser:
 
-    def __init__(self, experiment_info_filepath, patterns, linebreakers, verbose=True):
+    def __init__(self, experiment_info_filepath, patterns, linebreakers, verbose=False):
 
         self.linebreakers = linebreakers
         self.patterns = patterns
@@ -76,12 +76,12 @@ class TaskParser:
 
         # Add columns with extra info
         
-        for var_name in ["BREAK_ID", "TASK_ID", "REPEAT_ID", "COMBINATION_IDD", "EXPERIMENT_ID", "EXPERIMENT_NAME", 
-                         "DURATION", "STARTED_AT", "ENDED_AT", 
-                         "MAX_TRIES", "TRIES", "STATUS", "SUCCESS", "OUTPUT_DIR", "WORK_DIR",
-                         "CLUSTER_ID", "CLUSTER_NAME", "NODE_ID", "NODE_NAME", "WORKER_ID"]:
+        if verbose:
+            for var_name in ["BREAK_ID", "TASK_ID", "REPEAT_ID", "COMBINATION_ID", "EXPERIMENT_ID", "EXPERIMENT_NAME", 
+                            "DURATION", "STARTED_AT", "ENDED_AT", "MAX_TRIES", "TRIES",
+                            "CLUSTER_ID", "CLUSTER_NAME", "NODE_ID", "NODE_NAME", "WORKER_ID", "OUTPUT_DIR", "WORK_DIR"]:
 
-            self._add_column(var_name)
+                self._add_column(var_name)
 
         self.row_values = [None for _ in range(len(self.header_map))]
 
@@ -100,7 +100,7 @@ class TaskParser:
         # Filepaths for each task files
 
         info_filepath   = os.path.join(task_folderpath, "info.yml")
-        output_filepath = os.path.join(task_folderpath, "output.txt")
+        output_filepath = os.path.join(task_folderpath, "stdout")
         done_filepath   = os.path.join(task_folderpath, ".done")
 
         # We clean the output row, as we will populate it with the data from the task
@@ -111,7 +111,7 @@ class TaskParser:
         # If the done file does not exist, it means the task wasnot completed, this is likely a user mistake
 
         if not os.path.exists(done_filepath):
-            print("Task not marked as done:", task_folderpath)
+            warn("Task not completed:", task_folderpath)
         
         # Load the task info
 
@@ -131,18 +131,16 @@ class TaskParser:
         if self.verbose:
 
             self.row_values[self.header_map["BREAK_ID"        ]] = str(break_idd)
-            self.row_values[self.header_map["TASK_ID"         ]] = data["task_idd"        ]
-            self.row_values[self.header_map["REPEAT_ID"       ]] = data["repeat_idd"      ]
-            self.row_values[self.header_map["COMBINATION_IDD" ]] = data["perm_idd"        ]
-            self.row_values[self.header_map["EXPERIMENT_ID"   ]] = data["experiment_idd"  ]
+            self.row_values[self.header_map["TASK_ID"         ]] = data["task_id"         ]
+            self.row_values[self.header_map["REPEAT_ID"       ]] = data["repeat_id"       ]
+            self.row_values[self.header_map["COMBINATION_ID"  ]] = data["combination_id"  ]
+            self.row_values[self.header_map["EXPERIMENT_ID"   ]] = data["experiment_id"   ]
             self.row_values[self.header_map["EXPERIMENT_NAME" ]] = data["experiment_name" ]
             self.row_values[self.header_map["DURATION"        ]] = data["duration"        ]
             self.row_values[self.header_map["STARTED_AT"      ]] = data["started_at"      ]
             self.row_values[self.header_map["ENDED_AT"        ]] = data["ended_at"        ]
             self.row_values[self.header_map["MAX_TRIES"       ]] = data["max_tries"       ]
             self.row_values[self.header_map["TRIES"           ]] = data["tries"           ]
-            self.row_values[self.header_map["STATUS"          ]] = data["status"          ]
-            self.row_values[self.header_map["SUCCESS"         ]] = data["success"         ]
             self.row_values[self.header_map["OUTPUT_DIR"      ]] = data["output_dir"      ]
             self.row_values[self.header_map["WORK_DIR"        ]] = data["work_dir"        ]
 
@@ -185,10 +183,11 @@ class TaskParser:
 
 class ExperimentParser:
 
-    def __init__(self, patterns, linebreakers):
+    def __init__(self, patterns, linebreakers, verbose=False):
 
         self.linebreakers = linebreakers
         self.patterns     = patterns
+        self.verbose      = verbose
 
 
     def start(self, experiment_folder, output_file):
@@ -198,7 +197,7 @@ class ExperimentParser:
 
         experiment_info_filepath = os.path.join(experiment_folder, "info.yml")
         task_folderpaths         = glob(os.path.join(experiment_folder, "*"))
-        parser                   = TaskParser(experiment_info_filepath, self.patterns, self.linebreakers)
+        parser                   = TaskParser(experiment_info_filepath, self.patterns, self.linebreakers, self.verbose)
 
         with open(output_file, "w") as fout:
 

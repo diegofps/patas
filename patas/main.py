@@ -65,6 +65,7 @@ def do_exec_grid(argv):
     parser.add_argument('--filter-tasks',
                         type=str,
                         default=[],
+                        nargs='*',
                         metavar='A:B',
                         dest='task_filters',
                         help="restricts the tasks that will be executed [A:B, A:, :B, :]",
@@ -273,29 +274,34 @@ def do_exec_grid(argv):
 
     task_filters = []
 
-    for task in args.task_filters:
-        try:
+    for filters in args.task_filters:
+        for task in filters:
+            try:
 
-            cells = task.split(':')
+                cells = task.split(':')
 
-            if len(cells) == 2:
-                i1 = int(cells[0]) if cells[0] else 0
-                i2 = int(cells[1]) if cells[1] else float('inf')
-                task_filters.append((i1, i2))
+                if len(cells) == 2:
+                    i1 = int(cells[0]) if cells[0] else 0
+                    i2 = int(cells[1]) if cells[1] else float('inf')
+                    task_filters.append((i1, i2))
 
-            elif len(cells) == 1:
-                i1 = int(cells[0]) if cells[0] else 0
-                task_filters.append((i1, i1+1))
+                elif len(cells) == 1:
+                    i1 = int(cells[0]) if cells[0] else 0
+                    task_filters.append((i1, i1+1))
 
-            else:
+                else:
+                    error(f'Invalid --task-filter: {task}')
+
+            except ValueError:
                 error(f'Invalid --task-filter: {task}')
 
-        except ValueError:
-            error(f'Invalid --task-filter: {task}')
+    # Prepare the node_filters
+
+    node_filters = [x for filters in args.node_filters for x in filters ]
 
     # Create and run GridExec
 
-    burn = GridExec(task_filters, args.node_filters, args.output_folder, args.redo_tasks, args.recreate, args.confirmed, experiments, clusters)
+    burn = GridExec(task_filters, node_filters, args.output_folder, args.redo_tasks, args.recreate, args.confirmed, experiments, clusters)
     burn.start()
 
 def do_parse(argv):
@@ -342,6 +348,11 @@ def do_parse(argv):
                         help="emit a line break in the output csv",
                         action='append')
 
+    parser.add_argument('-v',
+                        dest='verbose',
+                        help="include extra columns in the output file",
+                        action='store_true')
+
     args = parser.parse_args(args=argv)
 
     # Convert the input values from '-p' and '-n' into Pattern objects
@@ -351,7 +362,7 @@ def do_parse(argv):
 
     # Parse the folder and generate the output file
 
-    parser = ExperimentParser(patterns, linebreakers)
+    parser = ExperimentParser(patterns, linebreakers, args.verbose)
     parser.start(args.experiment_folder, args.output_file)
 
 
