@@ -62,19 +62,15 @@ patas parse \
 This will generate the file `$HOME/Sources/patas/tmp/quick_experiment/output.csv`, containing a table with the collected results, input variables and many other variables associated to the experiment. We can use `patas query` to inspect its content.
 
 ```shell
-patas query 'select * from grid limit 5' -p
+patas query 'select * from grid limit 1' -p
 ```
 
 The output should be similar to the content bellow.
 
-/home/diego/.local/lib/python3.10/site-packages/agate/table/from_csv.py:70: RuntimeWarning: Error sniffing CSV dialect: Could not determine delimiter
-| in_activation | in_neurons | out_train_acc | out_test_acc | break_id | task_id | repeat_id | combination_id | experiment_id | experiment_name | duration |          started_at |            ended_at | tries | max_tries | cluster_id | cluster_name | node_id | node_name | worker_id | output_dir                                                  | work_dir                                  |
-| ------------- | ---------- | ------------- | ------------ | -------- | ------- | --------- | -------------- | ------------- | --------------- | -------- | ------------------- | ------------------- | ----- | --------- | ---------- | ------------ | ------- | --------- | --------- | ----------------------------------------------------------- | ----------------------------------------- |
-| sigmoid       |         10 |         0,909 |        0,913 |    False |      64 |         4 |              6 |         False | grid            |   0,032… | 2023-05-10 14:58:09 | 2023-05-10 14:58:09 |  True |         3 |      False | cluster      |   False | localhost |        44 | /home/diego/Sources/patas/examples/sanity/patasout/grid/64  | /home/diego/Sources/patas/examples/sanity |
-| relu          |         10 |         0,898 |        0,890 |    False |      41 |         1 |              4 |         False | grid            |   0,033… | 2023-05-10 14:58:09 | 2023-05-10 14:58:09 |  True |         3 |      False | cluster      |   False | localhost |        21 | /home/diego/Sources/patas/examples/sanity/patasout/grid/41  | /home/diego/Sources/patas/examples/sanity |
-| tanh          |         30 |         0,931 |        0,985 |    False |     231 |         1 |             23 |         False | grid            |   0,027… | 2023-05-10 14:58:09 | 2023-05-10 14:58:09 |  True |         3 |      False | cluster      |   False | localhost |         8 | /home/diego/Sources/patas/examples/sanity/patasout/grid/231 | /home/diego/Sources/patas/examples/sanity |
-| sigmoid       |         20 |         0,885 |        0,918 |    False |     142 |         2 |             14 |         False | grid            |   0,043… | 2023-05-10 14:58:09 | 2023-05-10 14:58:09 |  True |         3 |      False | cluster      |   False | localhost |        43 | /home/diego/Sources/patas/examples/sanity/patasout/grid/142 | /home/diego/Sources/patas/examples/sanity |
-| tanh          |         30 |         0,892 |        0,889 |    False |     235 |         5 |             23 |         False | grid            |   0,030… | 2023-05-10 14:58:09 | 2023-05-10 14:58:09 |  True |         3 |      False | cluster      |   False | localhost |         4 | /home/diego/Sources/patas/examples/sanity/patasout/grid/235 | /home/diego/Sources/patas/examples/sanity |
+| in_activation | in_neurons | out_train_acc | out_test_acc | break_id | task_id | repeat_id | combination_id | experiment_id | experiment_name | duration |          started_at |            ended_at | tries | max_tries | cluster_id | cluster_name | node_id | node_name | worker_id | output_dir                                                 | work_dir                                  |
+| ------------- | ---------- | ------------- | ------------ | -------- | ------- | --------- | -------------- | ------------- | --------------- | -------- | ------------------- | ------------------- | ----- | --------- | ---------- | ------------ | ------- | --------- | --------- | ---------------------------------------------------------- | ----------------------------------------- |
+| sigmoid       |         10 |         0,909 |        0,913 |    False |      64 |         4 |              6 |         False | grid            |   0,032… | 2023-05-10 14:58:09 | 2023-05-10 14:58:09 |  True |         3 |      False | cluster      |   False | localhost |        44 | /home/diego/Sources/patas/examples/sanity/patasout/grid/64 | /home/diego/Sources/patas/examples/sanity |
+| relu          |         10 |         0,898 |        0,890 |    False |      41 |         1 |              4 |         False | grid            |   0,033… | 2023-05-10 14:58:09 | 2023-05-10 14:58:09 |  True |         3 |      False | cluster      |   False | localhost |        21 | /home/diego/Sources/patas/examples/sanity/patasout/grid/41 | /home/diego/Sources/patas/examples/sanity |
 
 We must remember that for every combination, patas will execute the program `--repeat` times, passing the same input parameters and collecting multiple output variables. This is useful when the algorithm we are evaluating is non-deterministic and we wish to collect reliable metrics. To aggregate these values we can calculate the average value using the `AVG` function with the `GROUP BY` statement.
 
@@ -140,6 +136,14 @@ A possible output for the previous command would be.
 | relu          |          5 |    0,995… |   0,946… |
 
 
+```
+~/Sources/patas/patas/main.py draw heatmap \
+    --input ./examples/sanity/patasout/grid/grid.csv \
+    --x-column in_neurons \
+    --y-column in_activation \
+    --z-column out_test_acc \
+    --reduce mean
+```
 
 
 # TL;DR 💻

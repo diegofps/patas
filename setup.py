@@ -4,6 +4,7 @@ import setuptools
 
 
 long_description_content_type = "text/markdown"
+
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
@@ -29,7 +30,7 @@ setuptools.setup(
         ],
     },
     install_requires=[
-        'tqdm', 'csvkit'
+        'csvkit', 'matplotlib'
     ],
     extras_require={
         "full": []

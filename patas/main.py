@@ -10,169 +10,18 @@ from patas.utils import error, node_cpu_count, abort
 from patas.parse import ExperimentParser, Pattern
 from patas.query_engine import QueryEngine
 from patas.grid_exec import GridExec
+from patas import argparsers
+from patas import graphics
 
 from multiprocessing import cpu_count
-
-import argparse
 import sys
 
-DEFAULT_PATAS_OUTPUT_DIR = './patasout'
 
-def show_main_syntax():
-    print("Syntax: patas [explore,parse,query,plot] {ARGS}")
 
-def show_explore_syntax():
-    print("Syntax: patas explore [grid,cdeepso] {ARGS}")
+def create_experiments(args):
 
-def do_version(args):
-    print(f"Patas {c.version}")
-
-def do_explore_grid(argv):
-    
-    # argparse for 'patas explore grid'
-
-    parser = argparse.ArgumentParser(
-                        prog='patas explore grid',
-                        description='Execute a program permutating its input parameters.',
-                        epilog="Check the README.md to learn more tips on how to use this feature: https://github.com/diegofps/patas/blob/main/README.md",
-                        formatter_class=argparse.RawDescriptionHelpFormatter)
-
-    # General parameters
-
-    parser.add_argument('--cluster',
-                        type=str,
-                        metavar='FILEPATH',
-                        dest='cluster',
-                        help="path to a cluster file",
-                        action='append')
-
-    parser.add_argument('--experiment',
-                        type=str,
-                        metavar='FILEPATH',
-                        dest='experiment',
-                        help="path to an experiment file",
-                        action='append')
-
-    parser.add_argument('--redo',
-                        dest='redo_tasks',
-                        help="forces patas to redo all tasks when an experiment is executed again",
-                        action='store_true')
-
-    parser.add_argument('--recreate',
-                        dest='recreate',
-                        help="recreate the entire output folder if it contains a different experiment configuration",
-                        action='store_true')
-
-    parser.add_argument('--filter-tasks',
-                        type=str,
-                        default=[],
-                        nargs='*',
-                        metavar='A:B',
-                        dest='task_filters',
-                        help="restricts the tasks that will be executed [A:B, A:, :B, :]",
-                        action='append')
-
-    parser.add_argument('--filter-nodes',
-                        type=str,
-                        default=[],
-                        metavar='TAG',
-                        nargs='*',
-                        dest='node_filters',
-                        help="filter nodes that match these tags (AND)",
-                        action='store')
-
-    parser.add_argument('--node',
-                        type=str,
-                        nargs='*',
-                        metavar='NAME USER@HOST:PORT WORKERS TAG1 ...',
-                        dest='node',
-                        help="adds a machine with the given number of workers to the cluster",
-                        action='append')
-
-    parser.add_argument('-y',
-                        dest='confirmed',
-                        help="skip confirmation before starting the tasks",
-                        action='store_true')
-
-    parser.add_argument('-o',
-                        type=str,
-                        default=DEFAULT_PATAS_OUTPUT_DIR,
-                        metavar='FOLDER',
-                        dest='output_folder',
-                        help="folder to store the program outputs",
-                        action='store')
-
-    # Quick Experiment parameters
-
-    parser.add_argument('--name',
-                        type=str,
-                        default='grid',
-                        metavar='NAME',
-                        dest='name',
-                        help="changes the name of the experiment folder, default is grid",
-                        action='store')
-
-    parser.add_argument('--vl',
-                        type=str,
-                        nargs='*',
-                        default=[],
-                        metavar='VAL',
-                        dest='var_list',
-                        help="defines an input variable that can assume a fixed number of values",
-                        action='append')
-
-    parser.add_argument('--va',
-                        type=str,
-                        nargs=4,
-                        default=[],
-                        metavar=('NAME', 'MIN', 'MAX', 'FACTOR'),
-                        dest='var_arithmetic',
-                        help="defines an input variable that grows according to an arithmetic progression",
-                        action='append')
-
-    parser.add_argument('--vg',
-                        type=str,
-                        nargs=4,
-                        default=[],
-                        metavar=('NAME', 'MIN', 'MAX', 'FACTOR'),
-                        dest='var_geometric',
-                        help="defines an input variable that grows according to a geometric progression",
-                        action='append')
-
-    parser.add_argument('--repeat',
-                        type=int,
-                        metavar='R',
-                        default='1',
-                        dest='repeat',
-                        help="number of times that each combination must be executed",
-                        action='store')
-
-    parser.add_argument('--max-tries',
-                        type=int,
-                        metavar='T',
-                        dest='max_tries',
-                        help="maximum number of retries after a task has failed",
-                        action='store')
-
-    parser.add_argument('--workdir',
-                        type=str,
-                        metavar='W',
-                        dest='workdir',
-                        help="The working directory in the remote machines that will start the tasks",
-                        action='store')
-
-    parser.add_argument('--cmd',
-                        type=str,
-                        metavar='CMD',
-                        required=True,
-                        dest='cmd',
-                        help="command to be executed. Use {VAR_NAME} to replace its parameters with a named variable",
-                        action='append')
-
-    args        = parser.parse_args(args=argv)
     experiments = []
-    clusters    = []
-
+    
     # If experiment parameters are provided, create an experiment for them
 
     experiment = Experiment()
@@ -229,6 +78,13 @@ def do_explore_grid(argv):
             experiment = load_experiment(filepath)
             experiments.append(experiment)
     
+    return experiments
+
+
+def create_clusters(args):
+
+    clusters = []
+
     # If cluster files are provided, we will use them
 
     if args.cluster:
@@ -269,7 +125,7 @@ def do_explore_grid(argv):
                 
             cluster.nodes.append(node)
 
-    # If no cluster or node is provided, we will create a simple one for the local machine
+    # If no cluster or node is provided, we will create a simple one based on the local machine
 
     if not clusters:
 
@@ -282,10 +138,12 @@ def do_explore_grid(argv):
         cluster.name  = 'cluster'
 
         cluster.nodes.append(node)
-
         clusters.append(cluster)
+    
+    return clusters
 
-    # Prepare the tasks_filter
+
+def create_task_filters(args):
 
     task_filters = []
 
@@ -310,117 +168,92 @@ def do_explore_grid(argv):
             except ValueError:
                 error(f'Invalid attribute for --task-filter: {task}')
 
-    # Prepare the node_filters
+    return task_filters
 
-    node_filters = [ x for filters in args.node_filters for x in filters ]
 
-    # Create and run GridExec
+def create_node_filters(args):
 
-    burn = GridExec(task_filters, node_filters, args.output_folder, args.redo_tasks, args.recreate, args.confirmed, experiments, clusters)
-    burn.start()
+    return [ x for filters in args.node_filters for x in filters ]
+
+
+def create_patterns(args):
+
+    return [Pattern(name, pattern) for name, pattern in args.patterns]
+
+
+def create_linebreakers(args):
+
+    return [Pattern(None, pattern) for pattern in args.linebreakers]
+
+
+def do_explore_grid(argv):
+
+    args         = argparsers.parse_patas_explore_grid(argv)
+    experiments  = create_experiments(args)
+    clusters     = create_clusters(args)
+    task_filters = create_task_filters(args)
+    node_filters = create_node_filters(args)
+    gridexec     = GridExec(task_filters, node_filters, args.output_folder, args.redo_tasks, args.recreate, args.confirmed, experiments, clusters)
+
+    gridexec.start()
+
+
+def do_explore_cdeepso(argv):
+    abort("CDEEPSO is not implemented yet.")
+
 
 def do_parse(argv):
-    
-    # argparse for 'patas parse'
 
-    parser = argparse.ArgumentParser(
-                        prog='patas parse',
-                        description='Parse the output files from patas exec and generate a summary in csv',
-                        epilog="Check the README.md to learn more tips on how to use this feature: https://github.com/diegofps/patas/blob/main/README.md",
-                        formatter_class=argparse.RawDescriptionHelpFormatter)
+    args         = argparsers.parse_patas_parse(argv)
+    patterns     = create_patterns(args)
+    linebreakers = create_linebreakers(args)
+    parser       = ExperimentParser(patterns, linebreakers, True)
 
-    # General parameters
-
-    parser.add_argument('-e',
-                        type=str,
-                        metavar='FOLDERPATH',
-                        dest='experiment_folder',
-                        required=True,
-                        help="path to the experiment folder that must be parsed",
-                        action='store')
-
-    parser.add_argument('-o',
-                        type=str,
-                        metavar='FILEPATH',
-                        dest='output_file',
-                        help="path to the output csv file",
-                        action='store')
-
-    parser.add_argument('-p',
-                        type=str,
-                        metavar=('OUT_NAME', 'REGEX'),
-                        default=[],
-                        nargs=2,
-                        dest='patterns',
-                        help="regex containing a single group capture indicating the data that must be captured",
-                        action='append')
-
-    parser.add_argument('-n',
-                        type=str,
-                        metavar='REGEX',
-                        default=[],
-                        dest='linebreakers',
-                        help="emit a line break in the output csv",
-                        action='append')
-
-    args = parser.parse_args(args=argv)
-
-    # Convert the input values from '-p' and '-n' into Pattern objects
-
-    patterns     = [Pattern(name, pattern) for name, pattern in args.patterns]
-    linebreakers = [Pattern(None, pattern) for pattern in args.linebreakers]
-
-    # Parse the folder and generate the output file
-
-    parser = ExperimentParser(patterns, linebreakers, True)
     parser.start(args.experiment_folder, args.output_file)
 
 def do_query(argv):
     
-    # argparse for 'patas query'
-
-    parser = argparse.ArgumentParser(
-                        prog='patas query',
-                        description='Execute sql queries in the parsed experiments',
-                        epilog="Check the README.md to learn more tips on how to use this feature: https://github.com/diegofps/patas/blob/main/README.md",
-                        formatter_class=argparse.RawDescriptionHelpFormatter)
-
-    # General parameters
-
-    parser.add_argument('-i',
-                        type=str,
-                        default=DEFAULT_PATAS_OUTPUT_DIR,
-                        metavar='PATASPATH',
-                        dest='patas_folder',
-                        help="path to the output folder containing the experiments",
-                        action='store')
-
-    parser.add_argument('-p',
-                        dest='pretty_print',
-                        help="pretty print the output",
-                        action='store_true')
-
-    parser.add_argument(
-                        type=str,
-                        metavar='QUERY',
-                        dest='query',
-                        help="query that must be executed",
-                        action='store')
-    
-    args = parser.parse_args(args=argv)
-
+    args   = argparsers.parse_patas_query(argv)
     engine = QueryEngine(args.patas_folder)
     engine.query(args.query, args.pretty_print)
+
+
+def do_draw_heatmap(argv):
+
+    args = argparsers.parse_patas_draw_heatmap(argv)
+    graphics.render_heatmap(args.x_column, args.y_column, args.z_column,
+                            args.title, args.x_label, args.y_label,
+                            args.x_change, args.y_change, args.z_change,
+                            args.input_file, args.output_file, 
+                            args.z_format, args.size, args.verbose, args.reduce)
+
+
+def do_draw_lines(args):
+    abort("Draw Lines is not implemented yet.")
+
+
+def do_draw_bars(args):
+    abort("Draw Bars is not implemented yet.")
 
 
 def do_doctor(args):
     abort("doctor is not implemented yet.")
 
-def do_explore_cdeepso(args):
-    abort("CDEEPSO is not implemented yet.")
 
-def do_plot(args):
-    abort("Plotting is not implemented yet.")
+def do_version(args):
+    print(f"Patas {c.version}")
+
+
+def help_main_syntax():
+    print("Syntax: patas [explore,parse,query,draw] {ARGS}")
+
+
+def help_explore_syntax():
+    print("Syntax: patas explore [grid,cdeepso] {ARGS}")
+
+
+def help_draw_syntax():
+    print("Syntax: patas draw [heatmap, lines, bars] {ARGS}")
 
 
 def main(*params):
@@ -428,12 +261,12 @@ def main(*params):
     args = sys.argv[1:]
 
     if len(args) == 0:
-        show_main_syntax()
+        help_main_syntax()
     
     elif args[0] == 'explore':
 
         if len(args) == 1:
-            show_explore_syntax()
+            help_explore_syntax()
         
         elif args[1] == 'grid':
             do_explore_grid(args[2:])
@@ -442,7 +275,7 @@ def main(*params):
             do_explore_cdeepso(args[2:])
 
         else:
-            show_explore_syntax()
+            help_explore_syntax()
 
     elif args[0] == 'parse':
         do_parse(args[1:])
@@ -450,8 +283,22 @@ def main(*params):
     elif args[0] == 'query':
         do_query(args[1:])
 
-    elif args[0] == 'plot':
-        do_doctor(args[1:])
+    elif args[0] == 'draw':
+
+        if len(args) == 1:
+            help_draw_syntax()
+        
+        elif args[1] == 'heatmap':
+            do_draw_heatmap(args[2:])
+
+        elif args[1] == 'lines':
+            do_draw_lines(args[2:])
+
+        elif args[1] == 'bars':
+            do_draw_bars(args[2:])
+
+        else:
+            help_draw_syntax()
 
     elif args[0] == 'doctor':
         do_doctor(args[1:])
@@ -460,10 +307,10 @@ def main(*params):
         do_version()
 
     elif args[0] == '-h' or args[0] == '--help':
-        show_main_syntax()
+        help_main_syntax()
 
     else:
-        show_main_syntax()
+        help_main_syntax()
 
 
 if __name__ == "__main__":
