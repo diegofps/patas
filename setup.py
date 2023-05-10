@@ -29,7 +29,7 @@ setuptools.setup(
         ],
     },
     install_requires=[
-        'tqdm'
+        'tqdm', 'csvkit'
     ],
     extras_require={
         "full": []

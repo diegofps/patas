@@ -11,14 +11,14 @@ class Pattern:
     
     def __init__(self, name, pattern):
 
-        self.name    = "OUT_" + name
-        self.raw     = pattern
-        self.data    = None
+        self.name  = "out_" + name
+        self.raw   = pattern
+        self.data  = None
 
-        self.raw = self.raw.replace("@float@", "[-0-9\\.e\\+]+")
-        self.raw = self.raw.replace("@int@", "[-0-9\\+]+")
-        self.raw = self.raw.replace("@slug@", "[-0-9a-zA-Z_]+")
-        self.raw = self.raw.replace("@str@", "\"[^\"]+\"")
+        self.raw   = self.raw.replace("@float@", "[-0-9\\.e\\+]+")
+        self.raw   = self.raw.replace("@int@", "[-0-9\\+]+")
+        self.raw   = self.raw.replace("@slug@", "[-0-9a-zA-Z_]+")
+        self.raw   = self.raw.replace("@str@", "\"[^\"]+\"")
 
         self.regex = re.compile(self.raw)
    
@@ -67,7 +67,7 @@ class TaskParser:
             experiment_info = yaml.load(fin, Loader=yaml.FullLoader)
         
         for var_name in experiment_info["variables"].keys():
-            self._add_column("VAR_" + var_name)
+            self._add_column("in_" + var_name)
 
         # Add pattern columns
 
@@ -77,9 +77,9 @@ class TaskParser:
         # Add columns with extra info
         
         if verbose:
-            for var_name in ["BREAK_ID", "TASK_ID", "REPEAT_ID", "COMBINATION_ID", "EXPERIMENT_ID", "EXPERIMENT_NAME", 
-                            "DURATION", "STARTED_AT", "ENDED_AT", "MAX_TRIES", "TRIES",
-                            "CLUSTER_ID", "CLUSTER_NAME", "NODE_ID", "NODE_NAME", "WORKER_ID", "OUTPUT_DIR", "WORK_DIR"]:
+            for var_name in ["break_id", "task_id", "repeat_id", "combination_id", "experiment_id", "experiment_name", 
+                            "duration", "started_at", "ended_at", "tries", "max_tries", 
+                            "cluster_id", "cluster_name", "node_id", "node_name", "worker_id", "output_dir", "work_dir"]:
 
                 self._add_column(var_name)
 
@@ -121,7 +121,7 @@ class TaskParser:
         # Load the variable values
 
         for name, value in data["combination"].items():
-            name = "VAR_" + name
+            name = "in_" + name
             self.row_values[self.header_map[name]] = value
 
         # Load the extra data
@@ -130,25 +130,25 @@ class TaskParser:
 
         if self.verbose:
 
-            self.row_values[self.header_map["BREAK_ID"        ]] = str(break_idd)
-            self.row_values[self.header_map["TASK_ID"         ]] = data["task_id"         ]
-            self.row_values[self.header_map["REPEAT_ID"       ]] = data["repeat_id"       ]
-            self.row_values[self.header_map["COMBINATION_ID"  ]] = data["combination_id"  ]
-            self.row_values[self.header_map["EXPERIMENT_ID"   ]] = data["experiment_id"   ]
-            self.row_values[self.header_map["EXPERIMENT_NAME" ]] = data["experiment_name" ]
-            self.row_values[self.header_map["DURATION"        ]] = data["duration"        ]
-            self.row_values[self.header_map["STARTED_AT"      ]] = data["started_at"      ]
-            self.row_values[self.header_map["ENDED_AT"        ]] = data["ended_at"        ]
-            self.row_values[self.header_map["MAX_TRIES"       ]] = data["max_tries"       ]
-            self.row_values[self.header_map["TRIES"           ]] = data["tries"           ]
-            self.row_values[self.header_map["OUTPUT_DIR"      ]] = data["output_dir"      ]
-            self.row_values[self.header_map["WORK_DIR"        ]] = data["work_dir"        ]
+            self.row_values[self.header_map["break_id"        ]] = str(break_idd)
+            self.row_values[self.header_map["task_id"         ]] = data["task_id"         ]
+            self.row_values[self.header_map["repeat_id"       ]] = data["repeat_id"       ]
+            self.row_values[self.header_map["combination_id"  ]] = data["combination_id"  ]
+            self.row_values[self.header_map["experiment_id"   ]] = data["experiment_id"   ]
+            self.row_values[self.header_map["experiment_name" ]] = data["experiment_name" ]
+            self.row_values[self.header_map["duration"        ]] = data["duration"        ]
+            self.row_values[self.header_map["started_at"      ]] = data["started_at"      ]
+            self.row_values[self.header_map["ended_at"        ]] = data["ended_at"        ]
+            self.row_values[self.header_map["tries"           ]] = data["tries"           ]
+            self.row_values[self.header_map["max_tries"       ]] = data["max_tries"       ]
+            self.row_values[self.header_map["output_dir"      ]] = data["output_dir"      ]
+            self.row_values[self.header_map["work_dir"        ]] = data["work_dir"        ]
 
-            self.row_values[self.header_map["CLUSTER_ID"  ]] = data["env_variables"]["PATAS_CLUSTER_ID"  ]
-            self.row_values[self.header_map["CLUSTER_NAME"]] = data["env_variables"]["PATAS_CLUSTER_NAME"]
-            self.row_values[self.header_map["NODE_ID"     ]] = data["env_variables"]["PATAS_NODE_ID"     ]
-            self.row_values[self.header_map["NODE_NAME"   ]] = data["env_variables"]["PATAS_NODE_NAME"   ]
-            self.row_values[self.header_map["WORKER_ID"   ]] = data["env_variables"]["PATAS_WORKER_ID"   ]
+            self.row_values[self.header_map["cluster_id"  ]] = data["env_variables"]["PATAS_CLUSTER_ID"  ]
+            self.row_values[self.header_map["cluster_name"]] = data["env_variables"]["PATAS_CLUSTER_NAME"]
+            self.row_values[self.header_map["node_id"     ]] = data["env_variables"]["PATAS_NODE_ID"     ]
+            self.row_values[self.header_map["node_name"   ]] = data["env_variables"]["PATAS_NODE_NAME"   ]
+            self.row_values[self.header_map["worker_id"   ]] = data["env_variables"]["PATAS_WORKER_ID"   ]
 
         # Parse the patterns and write to output
 
@@ -167,10 +167,11 @@ class TaskParser:
 
                 for linebreaker in self.linebreakers:
                     if linebreaker.check(line):
+
                         writer.writerow(self.row_values)
 
                         break_idd += 1
-                        self.row_values[self.header_map["BREAK_ID"]] = str(break_idd)
+                        self.row_values[self.header_map["break_id"]] = str(break_idd)
 
                         for pattern in self.patterns:
                             self.row_values[self.header_map[pattern.get_name()]] = None
@@ -192,12 +193,15 @@ class ExperimentParser:
 
     def start(self, experiment_folder, output_file):
 
-        experiment_folder = expand_path(experiment_folder)
-        output_file       = output_file if output_file else os.path.join(experiment_folder, "output.csv")
-
+        experiment_folder        = expand_path(experiment_folder)
         experiment_info_filepath = os.path.join(experiment_folder, "info.yml")
         task_folderpaths         = glob(os.path.join(experiment_folder, "*"))
         parser                   = TaskParser(experiment_info_filepath, self.patterns, self.linebreakers, self.verbose)
+        
+        if output_file is None:
+            
+            experiment_name = os.path.basename(os.path.dirname(experiment_info_filepath))
+            output_file     = os.path.join(experiment_folder, experiment_name + ".csv")
 
         with open(output_file, "w") as fout:
 

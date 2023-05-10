@@ -6,32 +6,33 @@ except:
     from patas import consts as c
 
 from patas.schemas import Cluster, Experiment, Node, ListVariable, ArithmeticVariable, GeometricVariable, load_cluster, load_experiment
+from patas.utils import error, node_cpu_count, abort
 from patas.parse import ExperimentParser, Pattern
+from patas.query_engine import QueryEngine
 from patas.grid_exec import GridExec
-from patas.utils import error
 
 from multiprocessing import cpu_count
 
 import argparse
 import sys
 
-
+DEFAULT_PATAS_OUTPUT_DIR = './patasout'
 
 def show_main_syntax():
-    print("Syntax: patas [exec,parse,doctor] {ARGS}")
+    print("Syntax: patas [explore,parse,query,plot] {ARGS}")
 
-def show_exec_syntax():
-    print("Syntax: patas exec [grid] {ARGS}")
+def show_explore_syntax():
+    print("Syntax: patas explore [grid,cdeepso] {ARGS}")
 
 def do_version(args):
     print(f"Patas {c.version}")
 
-def do_exec_grid(argv):
+def do_explore_grid(argv):
     
-    # argparse for 'patas exec grid'
+    # argparse for 'patas explore grid'
 
     parser = argparse.ArgumentParser(
-                        prog='patas exec grid',
+                        prog='patas explore grid',
                         description='Execute a program permutating its input parameters.',
                         epilog="Check the README.md to learn more tips on how to use this feature: https://github.com/diegofps/patas/blob/main/README.md",
                         formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -95,13 +96,21 @@ def do_exec_grid(argv):
 
     parser.add_argument('-o',
                         type=str,
-                        default='./tmp',
+                        default=DEFAULT_PATAS_OUTPUT_DIR,
                         metavar='FOLDER',
                         dest='output_folder',
                         help="folder to store the program outputs",
                         action='store')
 
     # Quick Experiment parameters
+
+    parser.add_argument('--name',
+                        type=str,
+                        default='grid',
+                        metavar='NAME',
+                        dest='name',
+                        help="changes the name of the experiment folder, default is grid",
+                        action='store')
 
     parser.add_argument('--vl',
                         type=str,
@@ -160,16 +169,16 @@ def do_exec_grid(argv):
                         help="command to be executed. Use {VAR_NAME} to replace its parameters with a named variable",
                         action='append')
 
-    args = parser.parse_args(args=argv)
-
+    args        = parser.parse_args(args=argv)
     experiments = []
-    clusters = []
+    clusters    = []
 
     # If experiment parameters are provided, create an experiment for them
 
     experiment = Experiment()
 
-    experiment.name = 'quick_experiment'
+    if args.name:
+        experiment.name = args.name
 
     if args.repeat:
         experiment.repeat = args.repeat
@@ -230,7 +239,7 @@ def do_exec_grid(argv):
     if args.node:
         
         cluster = Cluster()
-        cluster.name = 'quick_cluster'
+        cluster.name = 'cluster'
         clusters.append(cluster)
 
         for i, node_params in enumerate(args.node):
@@ -239,7 +248,7 @@ def do_exec_grid(argv):
             node.name = f'node{i}'
 
             address      = node_params[0]
-            node.workers = int(node_params[1]) if len(node_params) > 1 else 1
+            node.workers = int(node_params[1]) if len(node_params) > 1 else None
             node.tags    = node_params[2:] if len(node_params) > 2 else []
 
             if ':' in address:
@@ -252,6 +261,9 @@ def do_exec_grid(argv):
             else:
                 node.hostname = address
 
+            if node.workers is None:
+                node.workers = node_cpu_count(node.user, node.hostname, node.port, 1)
+                
             cluster.nodes.append(node)
 
     # If no cluster or node is provided, we will create a simple one for the local machine
@@ -264,7 +276,7 @@ def do_exec_grid(argv):
         node.workers  = cpu_count()
 
         cluster       = Cluster()
-        cluster.name  = 'quick_cluster'
+        cluster.name  = 'cluster'
 
         cluster.nodes.append(node)
 
@@ -290,14 +302,14 @@ def do_exec_grid(argv):
                     task_filters.append((i1, i1+1))
 
                 else:
-                    error(f'Invalid --task-filter: {task}')
+                    error(f'Invalid attribute for --task-filter: {task}')
 
             except ValueError:
-                error(f'Invalid --task-filter: {task}')
+                error(f'Invalid attribute for --task-filter: {task}')
 
     # Prepare the node_filters
 
-    node_filters = [x for filters in args.node_filters for x in filters ]
+    node_filters = [ x for filters in args.node_filters for x in filters ]
 
     # Create and run GridExec
 
@@ -360,40 +372,80 @@ def do_parse(argv):
     parser = ExperimentParser(patterns, linebreakers, True)
     parser.start(args.experiment_folder, args.output_file)
 
+def do_query(argv):
+    
+    # argparse for 'patas query'
+
+    parser = argparse.ArgumentParser(
+                        prog='patas query',
+                        description='Execute sql queries in the parsed experiments',
+                        epilog="Check the README.md to learn more tips on how to use this feature: https://github.com/diegofps/patas/blob/main/README.md",
+                        formatter_class=argparse.RawDescriptionHelpFormatter)
+
+    # General parameters
+
+    parser.add_argument('-i',
+                        type=str,
+                        default=DEFAULT_PATAS_OUTPUT_DIR,
+                        metavar='PATASPATH',
+                        dest='patas_folder',
+                        help="path to the output folder containing the experiments",
+                        action='store')
+
+    parser.add_argument('-p',
+                        dest='pretty_print',
+                        help="pretty print the output",
+                        action='store_true')
+
+    parser.add_argument(
+                        type=str,
+                        metavar='QUERY',
+                        dest='query',
+                        help="query that must be executed",
+                        action='store')
+    
+    args = parser.parse_args(args=argv)
+
+    engine = QueryEngine(args.patas_folder)
+    engine.query(args.query, args.pretty_print)
 
 
 def do_doctor(args):
-    raise NotImplementedError("doctor is not implemented yet.")
+    abort("doctor is not implemented yet.")
 
-def do_exec_cdeepso(args):
-    raise NotImplementedError("CDEEPSO is not implemented yet.")
+def do_explore_cdeepso(args):
+    abort("CDEEPSO is not implemented yet.")
 
 def do_plot(args):
-    raise NotImplementedError("Plotting is not implemented yet.")
+    abort("Plotting is not implemented yet.")
 
 
 def main(*params):
+
     args = sys.argv[1:]
 
     if len(args) == 0:
         show_main_syntax()
     
-    elif args[0] == 'exec':
+    elif args[0] == 'explore':
 
         if len(args) == 1:
-            show_exec_syntax()
+            show_explore_syntax()
         
         elif args[1] == 'grid':
-            do_exec_grid(args[2:])
+            do_explore_grid(args[2:])
 
         elif args[1] == 'cdeepso':
-            do_exec_cdeepso(args[2:])
+            do_explore_cdeepso(args[2:])
 
         else:
-            show_exec_syntax()
+            show_explore_syntax()
 
     elif args[0] == 'parse':
         do_parse(args[1:])
+
+    elif args[0] == 'query':
+        do_query(args[1:])
 
     elif args[0] == 'plot':
         do_doctor(args[1:])

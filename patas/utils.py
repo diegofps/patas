@@ -355,6 +355,39 @@ def human_time(seconds):
 
     return f"{v} milleniums"
 
+
 def estimate(tasks, workers, seconds):
     
     return human_time(tasks / workers * seconds)
+
+
+def node_cpu_count(user, hostname, port, default):
+
+    if hostname in ['localhost', '127.0.0.1']:
+        status, output = run('nproc', read=True)
+
+    else:
+        cmd = [' ssh ']
+
+        if user:
+            cmd.append(user)
+            cmd.append('@')
+
+        cmd.append(hostname)
+
+        if port:
+            cmd.append(' -p')
+            cmd.append(str(port))
+        
+        cmd.append(" 'nproc'")
+
+        status, output = run("".join(cmd), read=True)
+
+    if status != 0:
+        return default
+
+    try:
+        return int(output[0])
+    except ValueError:
+        return default
+                

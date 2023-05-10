@@ -39,11 +39,11 @@ print(f"    Train accuracy: {train_accuracy:.3f}")
 print(f"    Test accuracy:  {test_accuracy:.3f}")
 ```
 
-Assuming we want to vary the number of hidden neurons in the range `[10, 20, 30]` and the activation function in `['sigmoid', 'relu']`, we can parallelize the script above and collect its output using `patas exec grid`. For example, executing the following command from `$HOME/Sources/patas/`, patas will create the output folder named `tmp` holding the experiment's outputs.
+Assuming we want to vary the number of hidden neurons in the range `[10, 20, 30]` and the activation function in `['sigmoid', 'relu']`, we can parallelize the script above and collect its output using `patas explore grid`. For example, executing the following command from `$HOME/Sources/patas/`, patas will create the output folder named `tmp` holding the experiment's outputs.
 
 ```shell
-patas exec grid \
-    --cmd './main.py {hidden_neurons} {activation_function}' \
+patas explore grid \
+    --cmd './main.py {neurons} {activation}' \
     --vl hidden_neurons 10 20 30 \
     --vl activation_function sigmoid relu \
     --workdir '$HOME/Sources/patas/examples/sanity' \
@@ -56,26 +56,31 @@ When the experiment is done, we can parse the outputs and collect desired values
 ```shell
 patas parse \
     -e 'tmp/quick_experiment/' \
-    -p TRAIN_ACC  'Train accuracy: (@float@)' \
-    -p TEST_ACC   'Test accuracy:  (@float@)'
+    -p train_acc  'Train accuracy: (@float@)' \
+    -p test_acc   'Test accuracy:  (@float@)'
 ```
 
-This will generate the file `$HOME/Sources/patas/tmp/quick_experiment/output.csv`, containing a table with the collected results, input variables and many other variables associated to the experiment. Its data should be similar to those displayed below.
+This will generate the file `$HOME/Sources/patas/tmp/quick_experiment/output.csv`, containing a table with the collected results, input variables and many other variables associated to the experiment. We can use `patas query` to inspect its content.
 
-| VAR_activation_function | VAR_hidden_neurons | OUT_TRAIN_ACC | OUT_TEST_ACC | BREAK_ID | TASK_ID | REPEAT_ID | COMBINATION_ID | EXPERIMENT_ID | EXPERIMENT_NAME | DURATION | STARTED_AT | ENDED_AT | MAX_TRIES | TRIES | CLUSTER_ID | CLUSTER_NAME | NODE_ID | NODE_NAME | WORKER_ID | OUTPUT_DIR | WORK_DIR |
-| ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- |
-| sigmoid | 10 | 0.937 | 0.923 | 0 | 1 | 1 | 0 | 0 | quick_experiment | 0.018904 | 2023-05-09 18:05:18.012184 | 2023-05-09 18:05:18.031088 | 3 | 1 | 0 | quick_cluster | 0 | local_machine | 16 | /home/ubuntu/Sources/patas/tmp/quick_experiment/1 | $HOME/Sources/patas/examples/sanity |
-| sigmoid | 20 | 0.927 | 0.916 | 0 | 8 | 2 | 2 | 0 | quick_experiment | 0.025697 | 2023-05-09 18:05:18.008116 | 2023-05-09 18:05:18.033813 | 3 | 1 | 0 | quick_cluster | 0 | local_machine | 9 | /home/ubuntu/Sources/patas/tmp/quick_experiment/8 | $HOME/Sources/patas/examples/sanity |
-| sigmoid | 30 | 0.921 | 0.912 | 0 | 13 | 1 | 4 | 0 | quick_experiment | 0.027901 | 2023-05-09 18:05:18.005924 | 2023-05-09 18:05:18.033825 | 3 | 1 | 0 | quick_cluster | 0 | local_machine | 4 | /home/ubuntu/Sources/patas/tmp/quick_experiment/13 | $HOME/Sources/patas/examples/sanity |
-| relu | 10 | 0.942 | 0.926 | 0 | 5 | 2 | 1 | 0 | quick_experiment | 0.027528 | 2023-05-09 18:05:18.010084 | 2023-05-09 18:05:18.037612 | 3 | 1 | 0 | quick_cluster | 0 | local_machine | 12 | /home/ubuntu/Sources/patas/tmp/quick_experiment/5 | $HOME/Sources/patas/examples/sanity |
-| ... | ... | .... | .... | ... | ... | ... | ... | ... | ... | .... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... |
+```shell
+./patas/main.py query 'select * from grid limit 5' -p
+```
 
+The output should be similar to the content bellow.
+
+| in_activation | in_neurons | out_train_acc | out_test_acc | break_id | task_id | repeat_id | combination_id | experiment_id | experiment_name | duration |          started_at |            ended_at | tries | max_tries | cluster_id | cluster_name | node_id | node_name | worker_id | output_dir                                 | work_dir                            |
+| ------------- | ---------- | ------------- | ------------ | -------- | ------- | --------- | -------------- | ------------- | --------------- | -------- | ------------------- | ------------------- | ----- | --------- | ---------- | ------------ | ------- | --------- | --------- | ------------------------------------------ | ----------------------------------- |
+| sigmoid       |         10 |         0,937 |        0,923 |    False |       1 |         1 |              0 |         False | grid            |   0,142… | 2023-05-10 11:09:18 | 2023-05-10 11:09:18 |  True |         3 |      False | cluster      |   False | node0     |         1 | /home/ubuntu/Sources/patas/patasout/grid/1  | $HOME/Sources/patas/examples/sanity |
+| sigmoid       |         20 |         0,927 |        0,916 |    False |       8 |         2 |              2 |         False | grid            |   0,151… | 2023-05-10 11:09:18 | 2023-05-10 11:09:18 |  True |         3 |      False | cluster      |   False | node0     |         2 | /home/ubuntu/Sources/patas/patasout/grid/8  | $HOME/Sources/patas/examples/sanity |
+| sigmoid       |         30 |         0,921 |        0,912 |    False |      13 |         1 |              4 |         False | grid            |   0,154… | 2023-05-10 11:09:17 | 2023-05-10 11:09:18 |  True |         3 |      False | cluster      |   False | node0     |         1 | /home/ubuntu/Sources/patas/patasout/grid/13 | $HOME/Sources/patas/examples/sanity |
+| relu          |         10 |         0,942 |        0,926 |    False |       5 |         2 |              1 |         False | grid            |   0,151… | 2023-05-10 11:09:18 | 2023-05-10 11:09:18 |  True |         3 |      False | cluster      |   False | node0     |         1 | /home/ubuntu/Sources/patas/patasout/grid/5  | $HOME/Sources/patas/examples/sanity |
+| relu          |         30 |         0,923 |        0,913 |    False |      17 |         2 |              5 |         False | grid            |   0,153… | 2023-05-10 11:09:17 | 2023-05-10 11:09:17 |  True |         3 |      False | cluster      |   False | node0     |         1 | /home/ubuntu/Sources/patas/patasout/grid/17 | $HOME/Sources/patas/examples/sanity |
 
 # TL;DR 💻
 
 ```shell
 # Parallelizing a program 
-patas exec grid \
+patas explore grid \
     --cmd './main.py {hidden_neurons} {activation_function}' \
     --vl hidden_neurons 10 20 30 \
     --vl activation_function sigmoid relu \
@@ -92,4 +97,4 @@ patas parse \
 
 # Source Code 🎼
 
-The source code is available in the project's [repository](https://github.com/diegofps/patas).
+The source code is available in the project's [repository](https://github.com/ubuntufps/patas).
