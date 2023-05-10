@@ -225,7 +225,7 @@ def do_draw_heatmap(argv):
                             args.title, args.x_label, args.y_label,
                             args.x_change, args.y_change, args.z_change,
                             args.input_file, args.output_file, 
-                            args.z_format, args.size, args.verbose, args.reduce)
+                            args.z_format, args.size, args.verbose, args.reduce, args.colormap)
 
 
 def do_draw_lines(args):

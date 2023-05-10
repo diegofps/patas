@@ -1,3 +1,4 @@
+from matplotlib.colors import LinearSegmentedColormap
 from matplotlib import pyplot as plt
 from collections import defaultdict
 
@@ -23,11 +24,42 @@ def find_all_values(column):
     return value2id, unique_values
 
 
+def get_colormap(colormap):
+
+    if len(colormap) == 0:
+        return None
+
+    elif len(colormap) == 1:
+        return colormap[0]
+    
+    else:
+        from matplotlib.colors import to_rgba
+
+        c1 = colormap[0]
+        c2 = colormap[1]
+
+        r1, g1, b1, _ = to_rgba(c1 if c1[0] == '#' else '#' + c1)
+        r2, g2, b2, _ = to_rgba(c2 if c2[0] == '#' else '#' + c2)
+
+        cdict = {
+            'red':   [[0, r1, r1],
+                      [1, r2, r2]],
+
+            'green': [[0, g1, g1],
+                      [1, g2, g2]],
+
+            'blue':  [[0, b1, b1],
+                      [1, b2, b2]]
+        }
+
+        return LinearSegmentedColormap('CustomCMap', segmentdata=cdict, N=256)
+
+
 def render_heatmap(x_column, y_column, z_column,
                    title, x_label, y_label,
                    x_change, y_change, z_change,
                    input_file, output_file, 
-                   z_format, size, verbose, reduce):
+                   z_format, size, verbose, reduce, colormap):
     
     # Read the data
 
@@ -42,7 +74,7 @@ def render_heatmap(x_column, y_column, z_column,
         print("DATA")
         print(data)
 
-    # Locate headers and create a new matrix
+    # Locate headers and isolate the parse the data into a new matrix
 
     x_index = np.where(headers == x_column)[0][0]
     y_index = np.where(headers == y_column)[0][0]
@@ -114,7 +146,7 @@ def render_heatmap(x_column, y_column, z_column,
         
     fig, ax = plt.subplots(figsize=size)
 
-    im = ax.imshow(heatmap)
+    im = ax.imshow(heatmap, cmap=get_colormap(colormap))
 
     cbar = ax.figure.colorbar(im, ax=ax)
     cbar.ax.set_ylabel("Intensity", rotation=-90, va="bottom")

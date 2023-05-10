@@ -351,6 +351,14 @@ def parse_patas_draw_heatmap(argv):
                         help='if the x,y pair have multiple values, reduce them using the given function.',
                         action='store')
 
+    parser.add_argument('--colormap', 
+                        type=str, 
+                        dest='colormap',
+                        nargs='*',
+                        metavar=('NAME|Color1', '{Color2}'),
+                        help='name of colormap to use - https://matplotlib.org/stable/tutorials/colors/colormaps.html ',
+                        action='store')
+
     parser.add_argument('--verbose', 
                         help='print extra info during execution',
                         action='store_true')
