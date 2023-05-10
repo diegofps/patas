@@ -185,6 +185,9 @@ def do_explore_grid(argv):
     
     if args.workdir:
         experiment.workdir = args.workdir
+    else:
+        from os import environ
+        experiment.workdir = environ['PWD']
     
     if args.cmd:
         experiment.cmd = args.cmd
@@ -271,7 +274,7 @@ def do_explore_grid(argv):
     if not clusters:
 
         node          = Node()
-        node.name     = 'local_machine'
+        node.name     = 'localhost'
         node.hostname = 'localhost'
         node.workers  = cpu_count()
 

@@ -17,6 +17,7 @@ Considering a use case that we need to find the optimal configuration for a neur
 ```python
 #!/usr/bin/env python3
 
+import random
 import sys
 
 # Read input parameters
@@ -30,8 +31,8 @@ print("Training model...")
 print("Evaluating model...")
 
 w = abs(int(hidden_neurons) + len(activation_function)) / 10
-train_accuracy = 0.9 + 0.1 / (1+  w)
-test_accuracy  = 0.9 + 0.1 / (1+2*w)
+train_accuracy = 0.9 + 0.1 / (1+  w) + random.gauss(0,0.05)
+test_accuracy  = 0.9 + 0.1 / (1+2*w) + random.gauss(0,0.05)
 
 # Print relevant results
 print("Results:")
@@ -44,18 +45,16 @@ Assuming we want to vary the number of hidden neurons in the range `[10, 20, 30]
 ```shell
 patas explore grid \
     --cmd './main.py {neurons} {activation}' \
-    --vl hidden_neurons 10 20 30 \
-    --vl activation_function sigmoid relu \
-    --workdir '$HOME/Sources/patas/examples/sanity' \
-    --repeat 2 \
-    -o tmp
+    --vl neurons 10 20 30 \
+    --vl activation sigmoid relu \
+    --repeat 10
 ```
 
 When the experiment is done, we can parse the outputs and collect desired values using `patas parse`.
 
 ```shell
 patas parse \
-    -e 'tmp/quick_experiment/' \
+    -e 'patasout/grid/' \
     -p train_acc  'Train accuracy: (@float@)' \
     -p test_acc   'Test accuracy:  (@float@)'
 ```
@@ -63,7 +62,7 @@ patas parse \
 This will generate the file `$HOME/Sources/patas/tmp/quick_experiment/output.csv`, containing a table with the collected results, input variables and many other variables associated to the experiment. We can use `patas query` to inspect its content.
 
 ```shell
-./patas/main.py query 'select * from grid limit 5' -p
+patas query 'select * from grid limit 5' -p
 ```
 
 The output should be similar to the content bellow.
@@ -75,6 +74,12 @@ The output should be similar to the content bellow.
 | sigmoid       |         30 |         0,921 |        0,912 |    False |      13 |         1 |              4 |         False | grid            |   0,154… | 2023-05-10 11:09:17 | 2023-05-10 11:09:18 |  True |         3 |      False | cluster      |   False | node0     |         1 | /home/ubuntu/Sources/patas/patasout/grid/13 | $HOME/Sources/patas/examples/sanity |
 | relu          |         10 |         0,942 |        0,926 |    False |       5 |         2 |              1 |         False | grid            |   0,151… | 2023-05-10 11:09:18 | 2023-05-10 11:09:18 |  True |         3 |      False | cluster      |   False | node0     |         1 | /home/ubuntu/Sources/patas/patasout/grid/5  | $HOME/Sources/patas/examples/sanity |
 | relu          |         30 |         0,923 |        0,913 |    False |      17 |         2 |              5 |         False | grid            |   0,153… | 2023-05-10 11:09:17 | 2023-05-10 11:09:17 |  True |         3 |      False | cluster      |   False | node0     |         1 | /home/ubuntu/Sources/patas/patasout/grid/17 | $HOME/Sources/patas/examples/sanity |
+
+```shell
+patas query 'select in_activation, in_neurons, avg(out_train_acc), avg(out_test_acc) from grid group by in_activation, in_neurons' -p
+```
+
+
 
 # TL;DR 💻
 
