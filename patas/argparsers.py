@@ -290,6 +290,13 @@ def parse_patas_draw_heatmap(argv):
                         help='label for the y axis',
                         action='store')
 
+    parser.add_argument('--z-label', 
+                        type=str, 
+                        dest='z_label',
+                        metavar='L',
+                        help='label for the z axis',
+                        action='store')
+
     parser.add_argument('--output', 
                         type=str, 
                         metavar='FILEPATH',
@@ -301,28 +308,28 @@ def parse_patas_draw_heatmap(argv):
                         type=str, 
                         metavar='CODE',
                         dest='x_change',
-                        help='transforms the x column using the variables data, i, and x. For example: --x-change "math.log2(data[i,x])"',
+                        help='transforms the x column using the variables X, Y, Z, math, and i. For example: --x-change "math.log2(X[i])"',
                         action='store')
 
     parser.add_argument('--y-change', 
                         type=str, 
                         metavar='CODE',
                         dest='y_change',
-                        help='transforms the y column using the variables data, i, and y. For example: --y-change "math.log2(data[i,y])"',
+                        help='transforms the y column using the variables X, Y, Z, math, and i. For example: --y-change "math.log2(Y[i])"',
                         action='store')
 
     parser.add_argument('--z-change', 
                         type=str, 
                         dest='z_change',
                         metavar='CODE',
-                        help='transforms the z column using the variables data, i, and z. For example: --z-change "data[0,0] / data[i,z]"',
+                        help='transforms the z column using the variables X, Y, Z, math, and i. For example: --z-change "Z[0]/Z[i]"',
                         action='store')
 
     parser.add_argument('--z-format', 
                         type=str,  
                         metavar='CODE',
                         dest='z_format',
-                        help='format displayed z values using the variables data, i, and z. Example: --z-format f"{int(float(data[i,z]))}"',
+                        help='formats heatmap values using the variables H, math, y, and x. Example: --z-format \'f"{int(H[y,x]*100)}"\'',
                         action='store')
 
     parser.add_argument('--size', 

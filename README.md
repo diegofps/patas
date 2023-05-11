@@ -155,6 +155,27 @@ patas draw heatmap \
 
 ![Heatmap example](docs/images/heatmap1.png)
 
+```shell
+patas draw heatmap \
+    --input 'patasout/grid/grid.csv' \
+    --x-column in_neurons \
+    --y-column in_activation \
+    --z-column out_test_acc \
+    --size 10 2 \
+    --x-change 'int(X[i])*2' \
+    --y-change 'Y[i][:3]' \
+    --z-change 'Z[i]*100' \
+    --z-format 'f"{int(H[y,x])}"' \
+    --x-label Neurons \
+    --y-label 'Activation Function' \
+    --z-label Accuracy \
+    --title 'Grid Search Results' \
+    --colormap AAAAAA 000011 \
+    --reduce min
+```
+
+![Heatmap example](docs/images/heatmap2.png)
+
 ### Bars
 
 TODO

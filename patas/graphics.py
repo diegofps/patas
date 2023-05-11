@@ -3,6 +3,7 @@ from matplotlib import pyplot as plt
 from collections import defaultdict
 
 import numpy as np
+import math
 
 
 def read_csv(filepath):
@@ -52,7 +53,7 @@ def get_colormap(colormap):
 
 
 def render_heatmap(x_column, y_column, z_column,
-                   title, x_label, y_label,
+                   title, x_label, y_label, z_label,
                    x_change, y_change, z_change,
                    input_file, output_file, 
                    z_format, size, verbose, reduce, colormap):
@@ -84,17 +85,30 @@ def render_heatmap(x_column, y_column, z_column,
 
     # Apply transformations
 
+    context = {
+        'math': math,
+        'X':data2[:,0],
+        'Y':data2[:,1],
+        'Z':data2[:,2],
+    }
+
     if x_change:
-        for y in range(data.shape[0]):
-            data2[y,0] = eval(x_change)
+        x_change = compile(x_change, 'x_change', 'eval')
+        for i in range(data.shape[0]):
+            context['i'] = i
+            data2[i,0] = eval(x_change, context)
 
     if y_change:
-        for y in range(data.shape[0]):
-            data2[y,1] = eval(y_change)
+        y_change = compile(y_change, 'y_change', 'eval')
+        for i in range(data.shape[0]):
+            context['i'] = i
+            data2[i,1] = eval(y_change, context)
 
     if z_change:
-        for y in range(data.shape[0]):
-            data2[y,2] = eval(z_change)
+        z_change = compile(z_change, 'z_change', 'eval')
+        for i in range(data.shape[0]):
+            context['i'] = i
+            data2[i,2] = eval(z_change, context)
 
 
     # Aggregate the results
@@ -145,7 +159,7 @@ def render_heatmap(x_column, y_column, z_column,
     im = ax.imshow(heatmap, cmap=get_colormap(colormap))
 
     cbar = ax.figure.colorbar(im, ax=ax)
-    cbar.ax.set_ylabel("Intensity", rotation=-90, va="bottom")
+    cbar.ax.set_ylabel(z_label if z_label else "Intensity", rotation=-90, va="bottom")
 
     ax.set_xticks(np.arange(len(x_value_to_pos)))
     ax.set_yticks(np.arange(len(y_value_to_pos)))
@@ -162,9 +176,21 @@ def render_heatmap(x_column, y_column, z_column,
     # Draw labels for each cell
 
     if z_format:
+
+        z_format = compile(z_format, 'z_format', 'eval')
+
+        context = {
+            'math': math,
+            'H': heatmap
+        }
+
         for y in range(len(y_value_to_pos)):
             for x in range(len(x_value_to_pos)):
-                value = eval(z_format)
+
+                context['y'] = y
+                context['x'] = x
+
+                value = eval(z_format, context)
                 text = ax.text(x, y, value, ha="center", va="center", color="w")
 
     # Draw labels for x and y axis

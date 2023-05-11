@@ -15,7 +15,7 @@ optimal_model_params = {
     "relu"      : (25 , 10, 0.98),
     "leaky_relu": (20 ,  5, 0.95),
     "sigmoid"   : (30 , 20, 0.97),
-    "tanh"      : (100, 50, 0.94),
+    "tanh"      : (13 , 20, 0.94),
 }
 
 p = optimal_model_params[activation_function]

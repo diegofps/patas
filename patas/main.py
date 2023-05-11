@@ -222,7 +222,7 @@ def do_draw_heatmap(argv):
 
     args = argparsers.parse_patas_draw_heatmap(argv)
     graphics.render_heatmap(args.x_column, args.y_column, args.z_column,
-                            args.title, args.x_label, args.y_label,
+                            args.title, args.x_label, args.y_label, args.z_label,
                             args.x_change, args.y_change, args.z_change,
                             args.input_file, args.output_file, 
                             args.z_format, args.size, args.verbose, args.reduce, args.colormap)
