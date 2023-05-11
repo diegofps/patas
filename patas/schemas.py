@@ -133,18 +133,9 @@ class ArithmeticVariable(Schema):
         self.update()
     
     def update(self):
-        self._values = self.arange(self.min, self.max, self.step)
+        from numpy import arange
+        self._values = arange(self.min, self.max, self.step)
     
-    def arange(self, first, last, step):
-        current = first
-        res = []
-
-        while current <= last:
-            res.append(current)
-            current += step
-        
-        return res
-
     @property
     def values(self):
         return self._values

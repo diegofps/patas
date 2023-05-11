@@ -1,5 +1,6 @@
 import argparse
 
+
 DEFAULT_PATAS_OUTPUT_DIR = './patasout'
 
 
@@ -329,7 +330,7 @@ def parse_patas_draw_heatmap(argv):
                         type=str,  
                         metavar='CODE',
                         dest='z_format',
-                        help='formats heatmap values using the variables H, math, y, and x. Example: --z-format \'f"{int(H[y,x]*100)}"\'',
+                        help='formats heatmap values using the variables D, math, y, and x. Example: --z-format \'int(D[y,x]*100)\'',
                         action='store')
 
     parser.add_argument('--size', 
@@ -360,5 +361,150 @@ def parse_patas_draw_heatmap(argv):
                         metavar=('NAME|C1', 'C2...'),
                         help='list of HTML colors without # or name of colormap from https://matplotlib.org/stable/tutorials/colors/colormaps.html',
                         action='store')
+
+    return parser.parse_args(args=argv)
+
+
+def parse_patas_draw_bars(argv):
+
+    parser = argparse.ArgumentParser(
+                        prog='patas draw bas',
+                        description='Draws bars from the input data',
+                        epilog="Check the README.md to learn more tips on how to use this feature: https://github.com/diegofps/patas/blob/main/README.md",
+                        formatter_class=argparse.RawDescriptionHelpFormatter)
+
+    # INITIAL PARAMETERS
+
+    parser.add_argument('--input', 
+                        type=str, 
+                        required=True, 
+                        metavar='FILEPATH',
+                        dest='input_file',
+                        help='filepath to the csv file containing the data',
+                        action='store')
+
+    parser.add_argument('--x-column', 
+                        type=str, 
+                        required=True, 
+                        metavar='X_COLUMN',
+                        dest='x_column',
+                        help='name of the x column in the data source',
+                        action='store')
+
+    parser.add_argument('--y-column', 
+                        type=str, 
+                        required=True, 
+                        metavar='Y_COLUMN',
+                        dest='y_column',
+                        help='name of the y column in the data source',
+                        action='store')
+
+    parser.add_argument('--title', 
+                        type=str, 
+                        dest='title',
+                        metavar='FILEPATH',
+                        help='title of the graphic',
+                        action='store')
+
+    parser.add_argument('--x-label', 
+                        type=str, 
+                        metavar='L',
+                        dest='x_label',
+                        help='label for the x axis',
+                        action='store')
+
+    parser.add_argument('--y-label', 
+                        type=str, 
+                        dest='y_label',
+                        metavar='L',
+                        help='label for the y axis',
+                        action='store')
+
+    parser.add_argument('--output', 
+                        type=str, 
+                        metavar='FILEPATH',
+                        dest='output_file',
+                        help='filepath of output file to save the image. If not present, the result will be displayed',
+                        action='store')
+
+    parser.add_argument('--x-change', 
+                        type=str, 
+                        metavar='CODE',
+                        dest='x_change',
+                        help='transforms the x column using the variables X, Y, Z, math, and i. For example: --x-change "math.log2(X[i])"',
+                        action='store')
+
+    parser.add_argument('--y-change', 
+                        type=str, 
+                        metavar='CODE',
+                        dest='y_change',
+                        help='transforms the y column using the variables X, Y, Z, math, and i. For example: --y-change "math.log2(Y[i])"',
+                        action='store')
+
+    parser.add_argument('--y-format', 
+                        type=str,  
+                        metavar='CODE',
+                        dest='y_format',
+                        help='formats y values using the variables D, math, and x. Example: --y-format \'int(D[x]*100)\'',
+                        action='store')
+
+    parser.add_argument('--size', 
+                        type=float, 
+                        nargs=2, 
+                        dest='size',
+                        metavar='W H',
+                        help='size of output image',
+                        action='store')
+
+    parser.add_argument('--reduce', 
+                        type=str, 
+                        choices=('sum', 'mean', 'std', 'product', 'min', 'max'),
+                        default='mean',
+                        dest='reduce',
+                        metavar='FUNC',
+                        help='if the x,y pair have multiple values, reduce them using the given function.',
+                        action='store')
+
+    parser.add_argument('--verbose', 
+                        help='print extra info during execution',
+                        action='store_true')
+
+    parser.add_argument('--color', 
+                        type=str, 
+                        dest='color',
+                        metavar='COLOR',
+                        help='an HTML color without #',
+                        action='store')
+
+    parser.add_argument('--width', 
+                        type=float, 
+                        dest='width',
+                        metavar='W',
+                        help='width of bar, a value from 0.0 to 1.0',
+                        action='store')
+
+    parser.add_argument('--ticks', 
+                        type=int, 
+                        dest='ticks',
+                        metavar='T',
+                        help='number of values to appear in the axis',
+                        action='store')
+
+    parser.add_argument('--tick-format', 
+                        type=str,  
+                        metavar='CODE',
+                        dest='tick_format',
+                        help='formats tick display value using its current value t. Example: --tick-format \'t:02f\'',
+                        action='store')
+
+    parser.add_argument('--horizontal',  
+                        dest='horizontal',
+                        help='set this flag if you want horizontal bars',
+                        action='store_true')
+
+    parser.add_argument('--gridlines',  
+                        dest='gridlines',
+                        help='set this flag if you want gridlines displayed',
+                        action='store_true')
 
     return parser.parse_args(args=argv)

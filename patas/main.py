@@ -5,20 +5,19 @@ try:
 except:
     from patas import consts as c
 
-from patas.schemas import Cluster, Experiment, Node, ListVariable, ArithmeticVariable, GeometricVariable, load_cluster, load_experiment
 from patas.utils import error, node_cpu_count, abort
-from patas.parse import ExperimentParser, Pattern
-from patas.query_engine import QueryEngine
-from patas.grid_explorer import GridExplorer
 from patas import argparsers
-from patas import graphics
 
-from multiprocessing import cpu_count
 import sys
 
+BASIC_OPTIONS   = ['explore', 'parse', 'query', 'draw', 'doctor']
+DRAW_OPTIONS    = ['heatmap', 'lines', 'lines_3d', 'bars', 'bars_3d', 'boxplot', 'violin', 'scatter', 'scatter_3d', 'surface', 'pie']
+EXPLORE_OPTIONS = ['grid', 'cdeepso']
 
 
 def create_experiments(args):
+
+    from patas.schemas import Experiment, ListVariable, ArithmeticVariable, GeometricVariable, load_experiment
 
     experiments = []
     
@@ -83,6 +82,8 @@ def create_experiments(args):
 
 def create_clusters(args):
 
+    from patas.schemas import Cluster, Node, load_cluster
+
     clusters = []
 
     # If cluster files are provided, we will use them
@@ -128,6 +129,8 @@ def create_clusters(args):
     # If no cluster or node is provided, we will create a simple one based on the local machine
 
     if not clusters:
+
+        from multiprocessing import cpu_count
 
         node          = Node()
         node.name     = 'localhost'
@@ -178,15 +181,21 @@ def create_node_filters(args):
 
 def create_patterns(args):
 
+    from patas.parse import Pattern
+
     return [Pattern(name, pattern) for name, pattern in args.patterns]
 
 
 def create_linebreakers(args):
 
+    from patas.parse import Pattern
+
     return [Pattern(None, pattern) for pattern in args.linebreakers]
 
 
 def do_explore_grid(argv):
+
+    from patas.grid_explorer import GridExplorer
 
     args         = argparsers.parse_patas_explore_grid(argv)
     experiments  = create_experiments(args)
@@ -204,6 +213,8 @@ def do_explore_cdeepso(argv):
 
 def do_parse(argv):
 
+    from patas.parse import ExperimentParser
+
     args         = argparsers.parse_patas_parse(argv)
     patterns     = create_patterns(args)
     linebreakers = create_linebreakers(args)
@@ -211,7 +222,10 @@ def do_parse(argv):
 
     parser.start(args.experiment_folder, args.output_file)
 
+
 def do_query(argv):
+
+    from patas.query_engine import QueryEngine
     
     args   = argparsers.parse_patas_query(argv)
     engine = QueryEngine(args.patas_folder)
@@ -220,97 +234,108 @@ def do_query(argv):
 
 def do_draw_heatmap(argv):
 
+    from patas import graphics
+
     args = argparsers.parse_patas_draw_heatmap(argv)
+
     graphics.render_heatmap(args.x_column, args.y_column, args.z_column,
                             args.title, args.x_label, args.y_label, args.z_label,
-                            args.x_change, args.y_change, args.z_change,
+                            args.x_change, args.y_change, args.z_change, args.z_format, 
                             args.input_file, args.output_file, 
-                            args.z_format, args.size, args.verbose, args.reduce, args.colormap)
+                            args.size, args.reduce, args.colormap, 
+                            args.verbose)
 
 
-def do_draw_lines(args):
-    abort("Draw Lines is not implemented yet.")
+def do_draw_lines(argv):
+    abort("Draw lines is not implemented yet.")
 
 
-def do_draw_bars(args):
-    abort("Draw Bars is not implemented yet.")
+def do_draw_lines_3d(argv):
+    abort("Draw lines_3d is not implemented yet.")
+
+
+def do_draw_bars(argv):
+    
+    from patas import graphics
+
+    args = argparsers.parse_patas_draw_bars(argv)
+
+    graphics.render_bars(args.x_column, args.y_column, 
+                         args.title, args.x_label, args.y_label, 
+                         args.x_change, args.y_change, args.y_format, 
+                         args.input_file, args.output_file, 
+                         args.size, args.reduce, args.color, args.width, args.horizontal, args.gridlines, args.ticks, args.tick_format,
+                         args.verbose)
+
+
+def do_draw_bars_3d(args):
+    abort("Draw bars_3d is not implemented yet.")
+
+
+def do_draw_boxplot(args):
+    abort("Draw boxplot is not implemented yet.")
+
+
+def do_draw_violin(args):
+    abort("Draw violin is not implemented yet.")
+
+
+def do_draw_scatter(args):
+    abort("Draw scatter is not implemented yet.")
+
+
+def do_draw_scatter_3d(args):
+    abort("Draw scatter_3d is not implemented yet.")
+
+
+def do_draw_surface(args):
+    abort("Draw surface is not implemented yet.")
+
+
+def do_draw_pie(args):
+    abort("Draw pie is not implemented yet.")
 
 
 def do_doctor(args):
     abort("doctor is not implemented yet.")
 
 
-def do_version(args):
-    print(f"Patas {c.version}")
-
-
 def help_main_syntax():
-    print("Syntax: patas [explore,parse,query,draw] {ARGS}")
+    print(f"Patas {c.version}")
+    print(f"Syntax: patas [{','.join(BASIC_OPTIONS)}] ...")
 
 
 def help_explore_syntax():
-    print("Syntax: patas explore [grid,cdeepso] {ARGS}")
+    print(f"Syntax: patas explore [{','.join(EXPLORE_OPTIONS)}] ...")
 
 
 def help_draw_syntax():
-    print("Syntax: patas draw [heatmap, lines, bars] {ARGS}")
+    print(f"Syntax: patas draw [{','.join(DRAW_OPTIONS)}] ...")
 
 
 def main(*params):
 
     args = sys.argv[1:]
 
-    if len(args) == 0:
+    if len(args) == 0 or not args[0] in BASIC_OPTIONS:
         help_main_syntax()
     
-    elif args[0] == 'explore':
+    if args[0] == 'explore':
 
-        if len(args) == 1:
+        if len(args) == 1 or not args[1] in EXPLORE_OPTIONS:
             help_explore_syntax()
         
-        elif args[1] == 'grid':
-            do_explore_grid(args[2:])
-
-        elif args[1] == 'cdeepso':
-            do_explore_cdeepso(args[2:])
-
-        else:
-            help_explore_syntax()
-
-    elif args[0] == 'parse':
-        do_parse(args[1:])
-
-    elif args[0] == 'query':
-        do_query(args[1:])
-
+        globals()['do_explore_' + args[1]](args[2:])
+        
     elif args[0] == 'draw':
 
-        if len(args) == 1:
+        if len(args) == 1 or not args[1] in DRAW_OPTIONS:
             help_draw_syntax()
         
-        elif args[1] == 'heatmap':
-            do_draw_heatmap(args[2:])
-
-        elif args[1] == 'lines':
-            do_draw_lines(args[2:])
-
-        elif args[1] == 'bars':
-            do_draw_bars(args[2:])
-
-        else:
-            help_draw_syntax()
-
-    elif args[0] == 'doctor':
-        do_doctor(args[1:])
-
-    elif args[0] == '-v' or args[0] == '--version':
-        do_version()
-
-    elif args[0] == '-h' or args[0] == '--help':
-        help_main_syntax()
+        globals()['do_draw_' + args[1]](args[2:])
 
     else:
-        help_main_syntax()
+        globals()['do_' + args[0]](args[1:])
 
 
 if __name__ == "__main__":

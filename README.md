@@ -153,7 +153,7 @@ patas draw heatmap \
     --size 10 2
 ```
 
-![Heatmap example](docs/images/heatmap1.png)
+![Basic heatmap example](https://github.com/diegofps/patas/blob/main/docs/images/heatmap1.png?raw=true)
 
 ```shell
 patas draw heatmap \
@@ -165,7 +165,7 @@ patas draw heatmap \
     --x-change 'int(X[i])*2' \
     --y-change 'Y[i][:3]' \
     --z-change 'Z[i]*100' \
-    --z-format 'f"{int(H[y,x])}"' \
+    --z-format 'int(D[y,x])' \
     --x-label Neurons \
     --y-label 'Activation Function' \
     --z-label Accuracy \
@@ -174,19 +174,41 @@ patas draw heatmap \
     --reduce min
 ```
 
-![Heatmap example](docs/images/heatmap2.png)
+![Extended heatmap example](https://github.com/diegofps/patas/blob/main/docs/images/heatmap2.png?raw=true)
 
 ### Bars
 
-TODO
+```shell
+patas draw bars \
+    --input test.csv \
+    --x-column in_neurons \
+    --y-column out_test_acc \
+    --size 10 2
+```
 
-![Bars example](docs/images/bars1.png)
+![Bars example](https://github.com/diegofps/patas/blob/main/docs/images/bars1.png?raw=true)
+
+```shell
+patas draw bars \
+    --input test.csv \
+    --x-column in_neurons \
+    --y-column out_test_acc \
+    --size 13 4 \
+    --width 0.9 \
+    --x-change 'int(float(X[i]))' \
+    --gridlines \
+    --color 000011 \
+    --tick-format 't:.2f' \
+    --ticks 5
+```
+
+![Bars example](https://github.com/diegofps/patas/blob/main/docs/images/bars2.png?raw=true)
 
 ### Lines
 
 TODO
 
-![Bars example](docs/images/lines1.png)
+![Bars example](https://github.com/diegofps/patas/blob/main/docs/images/lines1.png?raw=true)
 
 # TL;DR 💻
 

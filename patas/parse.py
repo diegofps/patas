@@ -205,7 +205,7 @@ class ExperimentParser:
 
         with open(output_file, "w") as fout:
 
-            writer = csv.writer(fout, delimiter=";")
+            writer = csv.writer(fout, delimiter=",")
             writer.writerow(parser.header_names)
 
             for task_folderpath in task_folderpaths:

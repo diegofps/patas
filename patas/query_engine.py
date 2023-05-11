@@ -24,9 +24,9 @@ class QueryEngine:
         tables = " ".join(self.tables)
 
         if pretty_print:
-            cmd = f"csvsql -d ';' --query {quote_single(query)} {tables} 2> /dev/null | csvlook"
+            cmd = f"csvsql -d ',' --query {quote_single(query)} {tables} 2> /dev/null | csvlook"
         else:
-            cmd = f"csvsql -d ';' --query {quote_single(query)} {tables} 2> /dev/null"
+            cmd = f"csvsql -d ',' --query {quote_single(query)} {tables} 2> /dev/null"
         
         status, _ = run(cmd)
 
