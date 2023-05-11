@@ -46,10 +46,11 @@ def get_size(size):
 def get_color(color):
     
     if color is None:
-        return 'maroon'
-    else:
-        from matplotlib.colors import to_rgba
-        return to_rgba(color if color[0] == '#' else '#' + color)
+        return None
+    
+    from matplotlib.colors import to_rgba
+
+    return to_rgba(color if color[0] == '#' else '#' + color)
 
 
 def get_width(width):
@@ -84,11 +85,15 @@ def find_column(headers, column_name):
     return np.where(headers == column_name)[0][0]
 
 
-def change_column(data, column_idx, change_function, name, context):
+def change_column(data, column_idx, change_function, name, context, add_f_string=True):
 
     if change_function:
-        change_function = compile('f"{' + change_function + '}"', name, 'eval')
+        
+        program = 'f"{' + change_function + '}"' if add_f_string else change_function
+        change_function = compile(program, name, 'eval')
+
         for i in range(data.shape[0]):
+
             context['i'] = i
             data[i,column_idx] = eval(change_function, context)
 
@@ -135,7 +140,7 @@ def render_heatmap(x_column, y_column, z_column,
 
     change_column(data2, 0, x_change, 'x_change', context)
     change_column(data2, 1, y_change, 'y_change', context)
-    change_column(data2, 2, z_change, 'z_change', context)
+    change_column(data2, 2, z_change, 'z_change', context, False)
 
     # Aggregate the results
     
@@ -234,7 +239,7 @@ def render_bars(x_column, y_column,
                 title, x_label, y_label, 
                 x_change, y_change, y_format, 
                 input_file, output_file, 
-                size, reduce, color, width, horizontal, gridlines, ticks, tick_format,
+                size, reduce, color, width, horizontal, gridlines, ticks, tick_format, border,
                 verbose):
     
     src     = read_csv(input_file)
@@ -257,7 +262,7 @@ def render_bars(x_column, y_column,
     }
 
     change_column(data2, 0, x_change, 'x_change', context)
-    change_column(data2, 1, y_change, 'y_change', context)
+    change_column(data2, 1, y_change, 'y_change', context, False)
 
     # Reduce values
     
@@ -311,17 +316,27 @@ def render_bars(x_column, y_column,
         ax.bar(x_data, y_data, color=get_color(color), width=get_width(width))
     
     if x_label:
-        ax.xlabel(x_label)
+        plt.xlabel(x_label)
     
     if y_label:
-        ax.ylabel(y_label)
+        plt.ylabel(y_label)
     
     if title:
-        ax.title(title)
+        plt.title(title)
     
+    # Hide box
+
+    if border in ['none', 'ticks']:
+        for s in ['top', 'bottom', 'left', 'right']:
+            ax.spines[s].set_visible(False)
+    
+    if border in ['none', 'lines']:
+        ax.xaxis.set_ticks_position('none')
+        ax.yaxis.set_ticks_position('none')
+
     # Format ticks 
 
-    tick_function            = plt.xticks if horizontal else plt.yticks
+    tick_function = plt.xticks if horizontal else plt.yticks
 
     if tick_format:
         tick_format = compile('f"{' + tick_format + '}"', 'tick_format', 'eval')

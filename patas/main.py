@@ -264,7 +264,7 @@ def do_draw_bars(argv):
                          args.title, args.x_label, args.y_label, 
                          args.x_change, args.y_change, args.y_format, 
                          args.input_file, args.output_file, 
-                         args.size, args.reduce, args.color, args.width, args.horizontal, args.gridlines, args.ticks, args.tick_format,
+                         args.size, args.reduce, args.color, args.width, args.horizontal, args.gridlines, args.ticks, args.tick_format, args.border,
                          args.verbose)
 
 

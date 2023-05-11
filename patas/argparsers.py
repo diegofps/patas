@@ -483,6 +483,14 @@ def parse_patas_draw_bars(argv):
                         help='width of bar, a value from 0.0 to 1.0',
                         action='store')
 
+    parser.add_argument('--border', 
+                        type=str,
+                        choices=('all', 'ticks', 'lines', 'none'),
+                        dest='border',
+                        metavar='MODE',
+                        help='style of the border, default is all',
+                        action='store')
+
     parser.add_argument('--ticks', 
                         type=int, 
                         dest='ticks',

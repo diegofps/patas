@@ -193,13 +193,17 @@ patas draw bars \
     --input test.csv \
     --x-column in_neurons \
     --y-column out_test_acc \
-    --size 13 4 \
-    --width 0.9 \
+    --size 10 2 \
+    --width 0.8 \
     --x-change 'int(float(X[i]))' \
     --gridlines \
-    --color 000011 \
+    --color B00020 \
     --tick-format 't:.2f' \
-    --ticks 5
+    --ticks 5 \
+    --title 'Performance using the function relu' \
+    --x-label 'Neurons' \
+    --y-label 'Accuracy' \
+    --border none
 ```
 
 ![Bars example](https://github.com/diegofps/patas/blob/main/docs/images/bars2.png?raw=true)
