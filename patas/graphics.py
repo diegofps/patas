@@ -13,15 +13,15 @@ def read_csv(filepath):
 def find_all_values(column):
 
     unique_values = []
-    value2id = {}
+    value_to_id   = {}
 
     for i in range(column.shape[0]):
-        l = column[i]
-        if not l in value2id:
-            value2id[l] = len(value2id)
-            unique_values.append(l)
+        value = column[i]
+        if not value in value_to_id:
+            value_to_id[value] = len(value_to_id)
+            unique_values.append(value)
 
-    return value2id, unique_values
+    return value_to_id, unique_values
 
 
 def get_colormap(colormap):
@@ -35,23 +35,15 @@ def get_colormap(colormap):
     else:
         from matplotlib.colors import to_rgba
 
-        c1 = colormap[0]
-        c2 = colormap[1]
-
-        r1, g1, b1, _ = to_rgba(c1 if c1[0] == '#' else '#' + c1)
-        r2, g2, b2, _ = to_rgba(c2 if c2[0] == '#' else '#' + c2)
+        colors = [to_rgba(x if x[0] == '#' else '#' + x) for x in colormap]
+        n      = len(colormap)
 
         cdict = {
-            'red':   [[0, r1, r1],
-                      [1, r2, r2]],
-
-            'green': [[0, g1, g1],
-                      [1, g2, g2]],
-
-            'blue':  [[0, b1, b1],
-                      [1, b2, b2]]
+            'red':   [[i/(n-1), color[0], color[0]] for i, color in enumerate(colors)],
+            'green': [[i/(n-1), color[1], color[1]] for i, color in enumerate(colors)],
+            'blue':  [[i/(n-1), color[2], color[2]] for i, color in enumerate(colors)],
         }
-
+        
         return LinearSegmentedColormap('CustomCMap', segmentdata=cdict, N=256)
 
 

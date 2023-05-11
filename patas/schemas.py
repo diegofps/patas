@@ -28,7 +28,7 @@ class Schema:
             setattr(self, name, data[name])
         
         elif mandatory:
-            error("Missing mandatory property in Node schema: " + name)
+            error(f"Missing required property in {self.__class__.__name__}: {name}")
 
 
 class Node(Schema):
@@ -165,6 +165,7 @@ class GeometricVariable(Schema):
         self.update()
     
     def update(self):
+        
         self._values = list()
         current = self.first
         
@@ -189,6 +190,7 @@ class GeometricVariable(Schema):
 class Experiment(Schema):
 
     def __init__(self):
+
         self.cmd = []
         self.name = None
         self.workdir = None
@@ -223,9 +225,9 @@ class Experiment(Schema):
                         self.vars.append(GeometricVariable(data2))
 
                     else:
-                        error(f"Invalid property value in Variable Schema: type={data2['type']}")
+                        error(f"Invalid property value in {self.__class__.__name__}: type={data2['type']}")
                 else:
-                    error('Missing mandatory property in Variable Schema: type')
+                    error(f'Missing required property in {self.__class__.__name__}: type')
 
         return self
 

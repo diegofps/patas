@@ -22,11 +22,11 @@ KEY_SSH_OFF = b'93dfc971-fa64-4beb-a24e-d8874738b9ca'
 KEY_CMD_ON  = b'15e6896c-3ea7-42a0-aa32-23e2ab3c0e12'
 KEY_CMD_OFF = b'e04a4348-8092-46a6-8e0c-d30d10c86fb3'
 
-echo = lambda x: b" echo -e \"%s\"" % x.replace(b"-", b"-\b-")
+build_echo_cmd = lambda x: b" echo -e \"%s\"" % x.replace(b"-", b"-\b-")
 
-ECHO_SSH_ON  = echo(KEY_SSH_ON)
-ECHO_SSH_OFF = echo(KEY_SSH_OFF)
-ECHO_CMD_ON  = echo(KEY_CMD_ON)
+ECHO_SSH_ON  = build_echo_cmd(KEY_SSH_ON)
+ECHO_SSH_OFF = build_echo_cmd(KEY_SSH_OFF)
+ECHO_CMD_ON  = build_echo_cmd(KEY_CMD_ON)
 ECHO_CMD_OFF = b" echo -en \"\n $? %s\"" % KEY_CMD_OFF.replace(b"-", b"-\b-")
 
 
@@ -48,7 +48,7 @@ def combine_variables(variables, combination={}):
         del combination[name]
 
 
-class QueueMsg(dict):
+class WorkerMessage(dict):
 
     def __init__(self, action, source=-1):
         self.action = action
@@ -76,28 +76,28 @@ class Task:
 
         self.experiment_name = experiment_name
         self.combination_idd = combination_idd
-        self.experiment_idd = experiment_idd
-        self.output_dir = task_output_dir
-        self.combination = combination
-        self.repeat_idd = repeat_idd
-        self.max_tries = max_tries
-        self.work_dir = work_dir
-        self.task_idd = task_idd
-        self.commands = cmdlines
-        self.assigned_to = None
-        self.started_at = None
-        self.ended_at = None
-        self.duration = None
-        self.success = None
-        self.output = None
-        self.status = None
-        self.tries = 0
+        self.experiment_idd  = experiment_idd
+        self.output_dir      = task_output_dir
+        self.combination     = combination
+        self.repeat_idd      = repeat_idd
+        self.max_tries       = max_tries
+        self.work_dir        = work_dir
+        self.task_idd        = task_idd
+        self.commands        = cmdlines
+        self.assigned_to     = None
+        self.started_at      = None
+        self.ended_at        = None
+        self.duration        = None
+        self.success         = None
+        self.output          = None
+        self.status          = None
+        self.tries           = 0
     
     
     def __repr__(self):
-        comb = ";".join(f"{k}={v}" for k, v in self.combination.items())
-        return "%d %d %d %d %s %s" % (self.experiment_idd, self.combination_idd, 
-                    self.repeat_idd, self.task_idd, comb, self.commands)
+
+        combination = ";".join(f"{k}={v}" for k, v in self.combination.items())
+        return f"{self.experiment_idd} {self.combination_idd} {self.repeat_idd} {self.task_idd} {combination} {self.commands}"
 
 
 class ExecutorBuilder:
@@ -105,6 +105,7 @@ class ExecutorBuilder:
     def __init__(self, executor_type, node):
         self.executor_type = executor_type
         self.node = node
+
 
     def __call__(self):
         return self.executor_type(self.node)
@@ -117,6 +118,7 @@ class BashExecutor:
         self.is_alive = True
         self.node = node
     
+
     def execute(self, initrc, cmds):
 
         if type(cmds) is not list:
@@ -153,6 +155,7 @@ class SSHExecutor:
 
         self._connect()
     
+
     def _build_connnection_string(self, node):
 
         tokens = [b' ssh']
@@ -306,16 +309,12 @@ class WorkerProcess:
         self.process.start()
 
 
-    # def debug(self, *args):
-    #     debug(self.worker_idd, "|", *args)
-
-
     def run(self, queue_in, queue_master):
 
         try:
             executor = self.executor_builder()
 
-            msg_out = QueueMsg("ready", self.worker_idd)
+            msg_out = WorkerMessage("ready", self.worker_idd)
             queue_master.put(msg_out)
             
             while True:
@@ -324,14 +323,14 @@ class WorkerProcess:
                 if msg_in.action == "execute":
                     success = self.execute(msg_in, executor)
 
-                    msg_out = QueueMsg("finished", self.worker_idd)
+                    msg_out = WorkerMessage("finished", self.worker_idd)
                     msg_out.success = success
                     queue_master.put(msg_out)
 
                     if not executor.is_alive:
                         executor = self.executor_builder()
 
-                    msg_out = QueueMsg("ready", self.worker_idd)
+                    msg_out = WorkerMessage("ready", self.worker_idd)
                     queue_master.put(msg_out)
                 
                 elif msg_in.action == "terminate":
@@ -340,7 +339,7 @@ class WorkerProcess:
                 else:
                     warn("Unknown action:", msg_in.action)
             
-            msg_out = QueueMsg("ended", self.worker_idd)
+            msg_out = WorkerMessage("ended", self.worker_idd)
             queue_master.put(msg_out)
         except KeyboardInterrupt:
             pass
@@ -427,22 +426,23 @@ class WorkerProcess:
         return task.success
 
 
-class GridExec():
+class GridExplorer():
 
     def __init__(self, task_filters, node_filters, 
             output_dir, redo_tasks, recreate, confirmed,
             experiments, clusters):
 
-        self.output_folder = expand_path(output_dir)
-        self.task_filters = task_filters
-        self.node_filters = node_filters
-        self.experiments = experiments
-        self.redo_tasks = redo_tasks
-        self.confirmed = confirmed
-        self.recreate = recreate
-        self.clusters = clusters
+        self.output_folder = expand_path  (output_dir)
+        self.task_filters  = task_filters
+        self.node_filters  = node_filters
+        self.experiments   = experiments
+        self.redo_tasks    = redo_tasks
+        self.confirmed     = confirmed
+        self.recreate      = recreate
+        self.clusters      = clusters
+
         self.workers:list[WorkerProcess] = None
-        self.tasks:list[Task] = None
+        self.tasks  :list[Task         ] = None
 
 
     def start(self):
@@ -462,8 +462,8 @@ class GridExec():
 
         print(colors.white("\n --- Experiments --- \n"))
 
+        experiment: Experiment = None
         total_tasks = 0
-        experiment: Experiment
 
         for experiment in experiments:
             variables = experiment.vars
@@ -770,7 +770,7 @@ class GridExec():
             # Sending TERMINATE signal
 
             for worker in self.workers:
-                msg = QueueMsg("terminate")
+                msg = WorkerMessage("terminate")
                 worker.queue.put(msg)
             
             # Waiting for ENDED signal
@@ -820,7 +820,7 @@ class GridExec():
     def _ready(self, msg_in):
 
         if self.todo:
-            msg_out = QueueMsg("execute")
+            msg_out = WorkerMessage("execute")
             msg_out.task = self.todo.pop()
             msg_out.task.assigned_to = msg_in.source
 
@@ -860,7 +860,7 @@ class GridExec():
 
         target = self.idle.pop()
 
-        msg_out = QueueMsg("execute")
+        msg_out = WorkerMessage("execute")
         msg_out.task = task
         msg_out.task.assigned_to = target
 

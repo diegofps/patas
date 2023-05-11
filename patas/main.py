@@ -9,7 +9,7 @@ from patas.schemas import Cluster, Experiment, Node, ListVariable, ArithmeticVar
 from patas.utils import error, node_cpu_count, abort
 from patas.parse import ExperimentParser, Pattern
 from patas.query_engine import QueryEngine
-from patas.grid_exec import GridExec
+from patas.grid_explorer import GridExplorer
 from patas import argparsers
 from patas import graphics
 
@@ -193,7 +193,7 @@ def do_explore_grid(argv):
     clusters     = create_clusters(args)
     task_filters = create_task_filters(args)
     node_filters = create_node_filters(args)
-    gridexec     = GridExec(task_filters, node_filters, args.output_folder, args.redo_tasks, args.recreate, args.confirmed, experiments, clusters)
+    gridexec     = GridExplorer(task_filters, node_filters, args.output_folder, args.redo_tasks, args.recreate, args.confirmed, experiments, clusters)
 
     gridexec.start()
 

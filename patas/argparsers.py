@@ -213,9 +213,9 @@ def parse_patas_query(argv):
                         help="path to the output folder containing the experiments",
                         action='store')
 
-    parser.add_argument('-p',
+    parser.add_argument('-m',
                         dest='pretty_print',
-                        help="pretty print the output",
+                        help="print the output using markdown format",
                         action='store_true')
 
     parser.add_argument(type=str,
@@ -271,7 +271,6 @@ def parse_patas_draw_heatmap(argv):
 
     parser.add_argument('--title', 
                         type=str, 
-                        default=None, 
                         dest='title',
                         metavar='FILEPATH',
                         help='title of the graphic',
@@ -279,7 +278,6 @@ def parse_patas_draw_heatmap(argv):
 
     parser.add_argument('--x-label', 
                         type=str, 
-                        default=None, 
                         metavar='L',
                         dest='x_label',
                         help='label for the x axis',
@@ -287,7 +285,6 @@ def parse_patas_draw_heatmap(argv):
 
     parser.add_argument('--y-label', 
                         type=str, 
-                        default=None, 
                         dest='y_label',
                         metavar='L',
                         help='label for the y axis',
@@ -295,7 +292,6 @@ def parse_patas_draw_heatmap(argv):
 
     parser.add_argument('--output', 
                         type=str, 
-                        default=None, 
                         metavar='FILEPATH',
                         dest='output_file',
                         help='filepath of output file to save the image. If not present, the result will be displayed',
@@ -303,39 +299,34 @@ def parse_patas_draw_heatmap(argv):
 
     parser.add_argument('--x-change', 
                         type=str, 
-                        default=None, 
-                        metavar='TRANSFORMATION',
+                        metavar='CODE',
                         dest='x_change',
                         help='transforms the x column using the variables data, i, and x. For example: --x-change "math.log2(data[i,x])"',
                         action='store')
 
     parser.add_argument('--y-change', 
                         type=str, 
-                        default=None, 
-                        metavar='TRANSFORMATION',
+                        metavar='CODE',
                         dest='y_change',
                         help='transforms the y column using the variables data, i, and y. For example: --y-change "math.log2(data[i,y])"',
                         action='store')
 
     parser.add_argument('--z-change', 
                         type=str, 
-                        default=None, 
                         dest='z_change',
-                        metavar='TRANSFORMATION',
+                        metavar='CODE',
                         help='transforms the z column using the variables data, i, and z. For example: --z-change "data[0,0] / data[i,z]"',
                         action='store')
 
     parser.add_argument('--z-format', 
-                        type=str, 
-                        default=None, 
-                        metavar='TRANSFORMATION',
+                        type=str,  
+                        metavar='CODE',
                         dest='z_format',
-                        help='format displayed z values using the variables data, i, and z. Example: --z-format "\"%d\" % int(float(data[i,z]))"',
+                        help='format displayed z values using the variables data, i, and z. Example: --z-format f"{int(float(data[i,z]))}"',
                         action='store')
 
     parser.add_argument('--size', 
                         type=float, 
-                        default=None, 
                         nargs=2, 
                         dest='size',
                         metavar='W H',
@@ -344,23 +335,23 @@ def parse_patas_draw_heatmap(argv):
 
     parser.add_argument('--reduce', 
                         type=str, 
-                        choices=['sum', 'mean', 'std', 'product', 'min', 'max'],
+                        choices=('sum', 'mean', 'std', 'product', 'min', 'max'),
                         default='mean',
                         dest='reduce',
                         metavar='FUNC',
                         help='if the x,y pair have multiple values, reduce them using the given function.',
                         action='store')
 
+    parser.add_argument('--verbose', 
+                        help='print extra info during execution',
+                        action='store_true')
+
     parser.add_argument('--colormap', 
                         type=str, 
                         dest='colormap',
                         nargs='*',
-                        metavar=('NAME|Color1', '{Color2}'),
-                        help='name of colormap to use - https://matplotlib.org/stable/tutorials/colors/colormaps.html ',
+                        metavar=('NAME|C1', 'C2...'),
+                        help='list of HTML colors without # or name of colormap from https://matplotlib.org/stable/tutorials/colors/colormaps.html',
                         action='store')
-
-    parser.add_argument('--verbose', 
-                        help='print extra info during execution',
-                        action='store_true')
 
     return parser.parse_args(args=argv)
