@@ -50,21 +50,21 @@ def create_experiments(args):
         var.values = values[1:]
         experiment.vars.append(var)
 
-    for name, min, max, factor in args.var_arithmetic:
-        var = ArithmeticVariable()
+    for name, min, max, step in args.var_arithmetic:
+        var      = ArithmeticVariable()
         var.name = name
-        var.min = min
-        var.max = max
-        var.factor = factor
+        var.min  = float(min)  if '.' in min  else int(min)
+        var.max  = float(max)  if '.' in max  else int(max)
+        var.step = float(step) if '.' in step else int(step)
         var.update()
         experiment.vars.append(var)
 
-    for name, min, max, factor in args.var_geometric:
-        var = GeometricVariable()
-        var.name = name
-        var.min = min
-        var.max = max
-        var.factor = factor
+    for name, min, max, step in args.var_geometric:
+        var        = GeometricVariable()
+        var.name   = name
+        var.min    = float(min)  if '.' in min  else int(min)
+        var.max    = float(max)  if '.' in max  else int(max)
+        var.factor = float(step) if '.' in step else int(step)
         var.update()
         experiment.vars.append(var)
 

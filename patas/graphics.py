@@ -12,21 +12,25 @@ def read_csv(filepath):
 
 def find_all_values(column):
 
-    unique_values = []
-    value_to_id   = {}
+    unique = np.unique(column)
 
-    for i in range(column.shape[0]):
-        value = column[i]
-        if not value in value_to_id:
-            value_to_id[value] = len(value_to_id)
-            unique_values.append(value)
+    try:
+        weights = unique.astype(float)
+    except ValueError:
+        weights = unique
+    
+    pairs = list(zip(weights, unique))
+    pairs.sort()
 
-    return value_to_id, unique_values
+    value_to_id = {x[1]:i for i,x in enumerate(pairs)}
+    values      = [x[1] for x in pairs]
+    
+    return value_to_id, values
 
 
 def get_colormap(colormap):
 
-    if len(colormap) == 0:
+    if not colormap:
         return None
 
     elif len(colormap) == 1:

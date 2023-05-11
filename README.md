@@ -16,7 +16,7 @@ Patas is designed to be a simple command line utility. It will not manage and co
 
 * `patas explore` - command to execute programs in parallel and collect their stouts. It will combine multiple variables and use each combination as input parameter.
 
-* `patas parse` - used to parse the programs stout and consolidate them in a single csv file. It uses patterns to locate which metrics that must be collected.
+* `patas parse` - used to parse the programs stout and consolidate them in a single csv file. It uses regular expressions to locate the metrics that must be collected.
 
 * `patas query` - apply sql queries directly into the generated csv files.
 
@@ -63,17 +63,17 @@ cd examples/basic_usage
 
 ## patas explore
 
-Assuming we want to vary the number of hidden neurons in the range `[5, 10, 15, 20, 25, 30]` and the activation function in `['relu' 'leaky_relu' 'sigmoid' 'tanh']`, we can generate all combinationsand parallelize the script above using `patas explore grid`. This will also collect its entire stdout and save them in the folder `patasout/grid`. Each combination will be executed 10 times, as we want to measure the average accuracies later.
+Assuming we want to vary the number of hidden neurons from `1` to `51` with steps of `2` and the activation function in `['relu' 'leaky_relu' 'sigmoid' 'tanh']`, we can generate all combinationsand parallelize the script above using `patas explore grid`. This will also collect its entire stdout and save them in the folder `patasout/grid`. Each combination will be executed `10` times, as we want to measure the average accuracies later.
 
 ```shell
 patas explore grid \
     --cmd './main.py {neurons} {activation}' \
-    --vl neurons 5 10 15 20 25 30 \
+    --va neurons 1 51 2 \
     --vl activation relu leaky_relu sigmoid tanh \
     --repeat 10
 ```
 
-The parameter `--cmd` define the command that must be executed. If we define more than one `--cmd` they will all be executed, one after the other. The parameter `--vl` defines a variable of type list, it receives the variable name and the list of values it can receive. Next, the parameter `--repeat` defines the number of times the program will be called using a given variable combination. In this example, the parameter neurons define `6` values and the paramter activation define `4` values. This will generate `24 combinations`. Considering the repeat parameter has the value `10`, the program will be excuted `240` times. That is, we have `240 tasks`.
+The parameter `--cmd` define the command that must be executed. If we define more than one `--cmd` they will all be executed, one after the other. The parameter `--vl` defines a variable of type list, it receives the variable name and the list of values it can receive. Next, the parameter `--repeat` defines the number of times the program will be called using a given variable combination. In this example, the parameter neurons define `26` values and the paramter activation define `4` values. This will generate `104 combinations`. Considering the repeat parameter has the value `10`, the program will be excuted `1040` times. That is, patas will have `1040 tasks` to do. You can define as many variable as you want, but the more you have the longer it will take to execute, growing exponentially.
 
 ## patas parse
 
@@ -99,10 +99,10 @@ patas query 'select * from grid limit 2' -m
 The parameter `-m` asks patas to print the output in markdown format.
 The output for the command above should have a similar structure to the content bellow. The values may vary as the script is non-determininstic.
 
-| in_activation | in_neurons | out_train_acc | out_test_acc | break_id | task_id | repeat_id | combination_id | experiment_id | experiment_name | duration |          started_at |            ended_at | tries | max_tries | cluster_id | cluster_name | node_id | node_name | worker_id | output_dir                                                 | work_dir                                  |
-| ------------- | ---------- | ------------- | ------------ | -------- | ------- | --------- | -------------- | ------------- | --------------- | -------- | ------------------- | ------------------- | ----- | --------- | ---------- | ------------ | ------- | --------- | --------- | ---------------------------------------------------------- | ----------------------------------------- |
-| sigmoid       |         10 |         0,909 |        0,913 |    False |      64 |         4 |              6 |         False | grid            |   0,032… | 2023-05-10 14:58:09 | 2023-05-10 14:58:09 |  True |         3 |      False | cluster      |   False | localhost |        44 | /home/diego/Sources/patas/examples/sanity/patasout/grid/64 | /home/diego/Sources/patas/examples/sanity |
-| relu          |         10 |         0,898 |        0,890 |    False |      41 |         1 |              4 |         False | grid            |   0,033… | 2023-05-10 14:58:09 | 2023-05-10 14:58:09 |  True |         3 |      False | cluster      |   False | localhost |        21 | /home/diego/Sources/patas/examples/sanity/patasout/grid/41 | /home/diego/Sources/patas/examples/sanity |
+| in_activation | in_neurons | out_train_acc | out_test_acc | break_id | task_id | repeat_id | combination_id | experiment_id | experiment_name | duration |          started_at |            ended_at | tries | max_tries | cluster_id | cluster_name | node_id | node_name | worker_id | output_dir                                                       | work_dir                                       |
+| ------------- | ---------- | ------------- | ------------ | -------- | ------- | --------- | -------------- | ------------- | --------------- | -------- | ------------------- | ------------------- | ----- | --------- | ---------- | ------------ | ------- | --------- | --------- | ---------------------------------------------------------------- | ---------------------------------------------- |
+| leaky_relu    |         25 |         0,487 |        0,452 |    False |     386 |         6 |             38 |         False | grid            |   0,048… | 2023-05-11 14:13:34 | 2023-05-11 14:13:34 |  True |         3 |      False | cluster      |   False | localhost |         7 | /home/ubuntu/Sources/patas/examples/basic_usage/patasout/grid/386 | /home/ubuntu/Sources/patas/examples/basic_usage |
+| sigmoid       |         27 |         0,841 |        0,820 |    False |     652 |         2 |             65 |         False | grid            |   0,055… | 2023-05-11 14:13:34 | 2023-05-11 14:13:34 |  True |         3 |      False | cluster      |   False | localhost |        57 | /home/ubuntu/Sources/patas/examples/basic_usage/patasout/grid/652 | /home/ubuntu/Sources/patas/examples/basic_usage |
 
 We must remember that for every combination, patas will execute the program `--repeat` times, passing the same input parameters and collecting multiple output variables. This is useful when the algorithm we are evaluating is non-deterministic and we wish to collect reliable metrics, like our script. To aggregate these values we can calculate the average value using the `AVG` function with the `GROUP BY` statement.
 
@@ -110,42 +110,13 @@ We must remember that for every combination, patas will execute the program `--r
 patas query '
     SELECT in_activation, 
            in_neurons, 
-           AVG(out_train_acc) as avg_train_acc, 
-           AVG(out_test_acc) as avg_test_acc
+           AVG(out_train_acc) AS avg_train_acc, 
+           AVG(out_test_acc) AS avg_test_acc
     FROM grid GROUP BY in_activation, in_neurons' -m
 ```
 
-This will give us an output similar to the content bellow.
 
-| in_activation | in_neurons | avg(out_train_acc) | avg(out_test_acc) |
-| ------------- | ---------- | ------------------ | ----------------- |
-| leaky_relu    |          5 |             0,950… |            0,920… |
-| leaky_relu    |         10 |             0,940… |            0,928… |
-| leaky_relu    |         15 |             0,928… |            0,912… |
-| leaky_relu    |         20 |             0,912… |            0,933… |
-| leaky_relu    |         25 |             0,935… |            0,914… |
-| leaky_relu    |         30 |             0,920… |            0,924… |
-| relu          |          5 |             0,995… |            0,946… |
-| relu          |         10 |             0,911… |            0,933… |
-| relu          |         15 |             0,942… |            0,930… |
-| relu          |         20 |             0,955… |            0,912… |
-| relu          |         25 |             0,932… |            0,915… |
-| relu          |         30 |             0,923… |            0,943… |
-| sigmoid       |          5 |             0,957… |            0,917… |
-| sigmoid       |         10 |             0,927… |            0,937… |
-| sigmoid       |         15 |             0,924… |            0,914… |
-| sigmoid       |         20 |             0,923… |            0,923… |
-| sigmoid       |         25 |             0,921… |            0,928… |
-| sigmoid       |         30 |             0,899… |            0,924… |
-| tanh          |          5 |             0,973… |            0,938… |
-| tanh          |         10 |             0,948… |            0,918… |
-| tanh          |         15 |             0,962… |            0,915… |
-| tanh          |         20 |             0,944… |            0,916… |
-| tanh          |         25 |             0,920… |            0,927… |
-| tanh          |         30 |             0,919… |            0,885… |
-
-
-To pick the input parameters that gave us the best average test_accuracy, we could use the following query.
+Similarly, to pick the input parameters that gave us the best average test_accuracy, we could use something like.
 
 ```shell
 patas query '
@@ -175,25 +146,26 @@ Patas will also help you quickly create basic graphics based on the data in the 
 
 ```shell
 patas draw heatmap \
-    --input ./examples/sanity/patasout/grid/grid.csv \
+    --input patasout/grid/grid.csv \
     --x-column in_neurons \
     --y-column in_activation \
-    --z-column out_test_acc
+    --z-column out_test_acc \
+    --size 10 2
 ```
 
-TODO
+![Heatmap example](docs/images/heatmap1.png)
 
 ### Bars
 
 TODO
 
+![Bars example](docs/images/bars1.png)
+
 ### Lines
 
 TODO
 
-# Documentation
-
-TODO
+![Bars example](docs/images/lines1.png)
 
 # TL;DR 💻
 

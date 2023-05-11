@@ -33,7 +33,7 @@ pivot = max(1, gauss(10, 4))
 speed = max(1, gauss(3.14, 0.2))
 
 for i in range(100):
-    loss = pivot / (i + 1) * speed
+    loss = pivot / gauss(i+1, 0.1) * speed
     print(f"Training epoch {i+1}, loss = {loss}")
 
 # Simulate that we are evaluating the model

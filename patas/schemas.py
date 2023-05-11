@@ -123,9 +123,9 @@ class ArithmeticVariable(Schema):
 
         self.type = 'arithmetic'
         self.name = None
-        self.factor = 1
-        self.min = 0
-        self.max = 10
+        self.step = 1
+        self.min  = 0
+        self.max  = 10
 
         if data is not None:
             self.init_from(data)
@@ -133,15 +133,25 @@ class ArithmeticVariable(Schema):
         self.update()
     
     def update(self):
-        self._values = self.arange(self.first, self.last, self.step)
+        self._values = self.arange(self.min, self.max, self.step)
     
+    def arange(self, first, last, step):
+        current = first
+        res = []
+
+        while current <= last:
+            res.append(current)
+            current += step
+        
+        return res
+
     @property
     def values(self):
         return self._values
     
     def init_from(self, data):
 
-        self.load_property('factor', data)
+        self.load_property('step', data)
         self.load_property('name', data)
         self.load_property('min', data)
         self.load_property('max', data)
