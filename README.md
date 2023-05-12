@@ -158,25 +158,29 @@ patas draw heatmap \
 ```shell
 patas draw heatmap \
     --input 'patasout/grid/grid.csv' \
-    --x-column in_neurons \
-    --y-column in_activation \
-    --z-column out_test_acc \
-    --size 10 2 \
-    --x-change 'int(X[i])*2' \
-    --y-change 'Y[i][:3]' \
-    --z-change 'Z[i]*100' \
-    --z-format 'int(D[y,x])' \
-    --x-label Neurons \
-    --y-label 'Activation Function' \
-    --z-label Accuracy \
     --title 'Grid Search Results' \
-    --colormap AAAAAA 000011 \
-    --reduce min
+    --x-column in_neurons \
+    --x-change 'int(X[i])*2' \
+    --x-label Neurons \
+    --y-column in_activation \
+    --y-change 'Y[i][:3]' \
+    --y-label 'Activation Function' \
+    --z-column out_test_acc \
+    --z-change 'Z[i]*100' \
+    --r-function min \
+    --r-format 'int(R[y,x])' \
+    --r-label Accuracy \
+    --size 10 2 \
+    --colormap AAAAAA 000011
 ```
 
 ![Extended heatmap example](https://github.com/diegofps/patas/blob/main/docs/images/heatmap2.png?raw=true)
 
 ### Bars
+
+```shell
+patas query 'select * from grid where in_activation="relu"' > test.csv
+```
 
 ```shell
 patas draw bars \
@@ -191,18 +195,22 @@ patas draw bars \
 ```shell
 patas draw bars \
     --input test.csv \
-    --x-column in_neurons \
-    --y-column out_test_acc \
-    --size 10 2 \
-    --width 0.8 \
-    --x-change 'int(float(X[i]))' \
-    --gridlines \
-    --color B00020 \
-    --tick-format 't:.2f' \
-    --ticks 5 \
     --title 'Performance using the function relu' \
+    --x-column in_neurons \
+    --x-change 'int(float(X[i]))' \
     --x-label 'Neurons' \
-    --y-label 'Accuracy' \
+    --y-column out_test_acc \
+    --y-change 'round(Y[i]*100)/100' \
+    --r-function mean \
+    --r-format 'R[i]:.2f' \
+    --r-label 'Accuracy' \
+    --size 10 2 \
+    --bar-size 0.8 \
+    --bar-color B00020 \
+    --show-grid \
+    --show-error \
+    --ticks 5 \
+    --ticks-format 'T[i]:.2f' \
     --border none
 ```
 
@@ -236,4 +244,4 @@ patas query 'select * from grid' -m
 
 # Source Code 🎼
 
-The source code is available in the project's [repository](https://github.com/ubuntufps/patas).
+The source code is available in the project's [repository](https://github.com/diegofps/patas).

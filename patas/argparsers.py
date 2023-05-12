@@ -270,6 +270,27 @@ def parse_patas_draw_heatmap(argv):
                         help='name of the z column in the data source',
                         action='store')
 
+    parser.add_argument('--x-change', 
+                        type=str, 
+                        metavar='CODE',
+                        dest='x_change',
+                        help='transforms the x column. For example: --x-change "math.log2(X[i])"',
+                        action='store')
+
+    parser.add_argument('--y-change', 
+                        type=str, 
+                        metavar='CODE',
+                        dest='y_change',
+                        help='transforms the y column. For example: --y-change "math.log2(Y[i])"',
+                        action='store')
+
+    parser.add_argument('--z-change', 
+                        type=str, 
+                        dest='z_change',
+                        metavar='CODE',
+                        help='transforms the z column. For example: --z-change "Z[0]/Z[i]"',
+                        action='store')
+
     parser.add_argument('--title', 
                         type=str, 
                         dest='title',
@@ -291,11 +312,11 @@ def parse_patas_draw_heatmap(argv):
                         help='label for the y axis',
                         action='store')
 
-    parser.add_argument('--z-label', 
+    parser.add_argument('--r-label', 
                         type=str, 
-                        dest='z_label',
+                        dest='r_label',
                         metavar='L',
-                        help='label for the z axis',
+                        help='label for the reduced data',
                         action='store')
 
     parser.add_argument('--output', 
@@ -305,32 +326,20 @@ def parse_patas_draw_heatmap(argv):
                         help='filepath of output file to save the image. If not present, the result will be displayed',
                         action='store')
 
-    parser.add_argument('--x-change', 
+    parser.add_argument('--r-function', 
                         type=str, 
-                        metavar='CODE',
-                        dest='x_change',
-                        help='transforms the x column using the variables X, Y, Z, math, and i. For example: --x-change "math.log2(X[i])"',
+                        choices=('sum', 'mean', 'std', 'product', 'min', 'max'),
+                        default='mean',
+                        dest='r_function',
+                        metavar='NAME',
+                        help='each y,x pair will usualy map to multiple values, this function defines how to reduce them.',
                         action='store')
 
-    parser.add_argument('--y-change', 
-                        type=str, 
-                        metavar='CODE',
-                        dest='y_change',
-                        help='transforms the y column using the variables X, Y, Z, math, and i. For example: --y-change "math.log2(Y[i])"',
-                        action='store')
-
-    parser.add_argument('--z-change', 
-                        type=str, 
-                        dest='z_change',
-                        metavar='CODE',
-                        help='transforms the z column using the variables X, Y, Z, math, and i. For example: --z-change "Z[0]/Z[i]"',
-                        action='store')
-
-    parser.add_argument('--z-format', 
+    parser.add_argument('--r-format', 
                         type=str,  
                         metavar='CODE',
-                        dest='z_format',
-                        help='formats heatmap values using the variables D, math, y, and x. Example: --z-format \'int(D[y,x]*100)\'',
+                        dest='r_format',
+                        help='formats the reduced values for display. Example: --r-format \'int(R[y,x]*100)\'',
                         action='store')
 
     parser.add_argument('--size', 
@@ -339,15 +348,6 @@ def parse_patas_draw_heatmap(argv):
                         dest='size',
                         metavar='W H',
                         help='size of output image',
-                        action='store')
-
-    parser.add_argument('--reduce', 
-                        type=str, 
-                        choices=('sum', 'mean', 'std', 'product', 'min', 'max'),
-                        default='mean',
-                        dest='reduce',
-                        metavar='FUNC',
-                        help='if the x,y pair have multiple values, reduce them using the given function.',
                         action='store')
 
     parser.add_argument('--verbose', 
@@ -413,11 +413,11 @@ def parse_patas_draw_bars(argv):
                         help='label for the x axis',
                         action='store')
 
-    parser.add_argument('--y-label', 
+    parser.add_argument('--r-label', 
                         type=str, 
-                        dest='y_label',
+                        dest='r_label',
                         metavar='L',
-                        help='label for the y axis',
+                        help='label for the reduced values',
                         action='store')
 
     parser.add_argument('--output', 
@@ -441,11 +441,20 @@ def parse_patas_draw_bars(argv):
                         help='transforms the y column using the variables X, Y, Z, math, and i. For example: --y-change "math.log2(Y[i])"',
                         action='store')
 
-    parser.add_argument('--y-format', 
+    parser.add_argument('--r-function', 
+                        type=str, 
+                        choices=('sum', 'mean', 'std', 'product', 'min', 'max'),
+                        default='mean',
+                        dest='r_function',
+                        metavar='NAME',
+                        help='each x value will usualy map to multiple values, this function defines how to reduce them.',
+                        action='store')
+
+    parser.add_argument('--r-format', 
                         type=str,  
                         metavar='CODE',
-                        dest='y_format',
-                        help='formats y values using the variables D, math, and x. Example: --y-format \'int(D[x]*100)\'',
+                        dest='r_format',
+                        help='formats reduced values for display. Example: --r-format \'int(D[x]*100)\'',
                         action='store')
 
     parser.add_argument('--size', 
@@ -456,31 +465,22 @@ def parse_patas_draw_bars(argv):
                         help='size of output image',
                         action='store')
 
-    parser.add_argument('--reduce', 
-                        type=str, 
-                        choices=('sum', 'mean', 'std', 'product', 'min', 'max'),
-                        default='mean',
-                        dest='reduce',
-                        metavar='FUNC',
-                        help='if the x,y pair have multiple values, reduce them using the given function.',
-                        action='store')
-
     parser.add_argument('--verbose', 
                         help='print extra info during execution',
                         action='store_true')
 
-    parser.add_argument('--color', 
+    parser.add_argument('--bar-color', 
                         type=str, 
-                        dest='color',
+                        dest='bar_color',
                         metavar='COLOR',
                         help='an HTML color without #',
                         action='store')
 
-    parser.add_argument('--width', 
+    parser.add_argument('--bar-size', 
                         type=float, 
-                        dest='width',
+                        dest='bar_size',
                         metavar='W',
-                        help='width of bar, a value from 0.0 to 1.0',
+                        help='size of each bar, a value from 0.0 to 1.0',
                         action='store')
 
     parser.add_argument('--border', 
@@ -498,11 +498,11 @@ def parse_patas_draw_bars(argv):
                         help='number of values to appear in the axis',
                         action='store')
 
-    parser.add_argument('--tick-format', 
+    parser.add_argument('--ticks-format', 
                         type=str,  
                         metavar='CODE',
-                        dest='tick_format',
-                        help='formats tick display value using its current value t. Example: --tick-format \'t:02f\'',
+                        dest='ticks_format',
+                        help='formats tick display value using its current value t. Example: --ticks-format \'t:02f\'',
                         action='store')
 
     parser.add_argument('--horizontal',  
@@ -510,9 +510,14 @@ def parse_patas_draw_bars(argv):
                         help='set this flag if you want horizontal bars',
                         action='store_true')
 
-    parser.add_argument('--gridlines',  
-                        dest='gridlines',
+    parser.add_argument('--show-grid',  
+                        dest='show_grid',
                         help='set this flag if you want gridlines displayed',
+                        action='store_true')
+
+    parser.add_argument('--show-error',  
+                        dest='show_error',
+                        help='set this flag if you want the standard deviation to be shown',
                         action='store_true')
 
     return parser.parse_args(args=argv)

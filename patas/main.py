@@ -239,10 +239,10 @@ def do_draw_heatmap(argv):
     args = argparsers.parse_patas_draw_heatmap(argv)
 
     graphics.render_heatmap(args.x_column, args.y_column, args.z_column,
-                            args.title, args.x_label, args.y_label, args.z_label,
-                            args.x_change, args.y_change, args.z_change, args.z_format, 
+                            args.title, args.x_label, args.y_label, args.r_label,
+                            args.x_change, args.y_change, args.z_change, args.r_format, 
                             args.input_file, args.output_file, 
-                            args.size, args.reduce, args.colormap, 
+                            args.size, args.r_function, args.colormap, 
                             args.verbose)
 
 
@@ -261,10 +261,11 @@ def do_draw_bars(argv):
     args = argparsers.parse_patas_draw_bars(argv)
 
     graphics.render_bars(args.x_column, args.y_column, 
-                         args.title, args.x_label, args.y_label, 
-                         args.x_change, args.y_change, args.y_format, 
+                         args.title, args.x_label, args.r_label, 
+                         args.x_change, args.y_change, args.r_format, 
                          args.input_file, args.output_file, 
-                         args.size, args.reduce, args.color, args.width, args.horizontal, args.gridlines, args.ticks, args.tick_format, args.border,
+                         args.size, args.r_function, args.bar_color, args.bar_size, args.horizontal, args.show_grid, 
+                         args.ticks, args.ticks_format, args.border, args.show_error,
                          args.verbose)
 
 

@@ -93,16 +93,14 @@ def change_column(data, column_idx, change_function, name, context, add_f_string
         change_function = compile(program, name, 'eval')
 
         for i in range(data.shape[0]):
-
-            context['i'] = i
-            data[i,column_idx] = eval(change_function, context)
+            data[i,column_idx] = eval(change_function, {'i':i, **context})
 
 
 def render_heatmap(x_column, y_column, z_column,
-                   title, x_label, y_label, z_label,
-                   x_change, y_change, z_change, z_format, 
+                   title, x_label, y_label, r_label,
+                   x_change, y_change, z_change, r_format, 
                    input_file, output_file, 
-                   size, reduce, colormap, verbose):
+                   size, r_function, colormap, verbose):
     
     # Read the data
 
@@ -133,14 +131,15 @@ def render_heatmap(x_column, y_column, z_column,
 
     context = {
         'math': math,
+        'np': np,
         'X':data2[:,0],
         'Y':data2[:,1],
         'Z':data2[:,2],
     }
 
-    change_column(data2, 0, x_change, 'x_change', context)
-    change_column(data2, 1, y_change, 'y_change', context)
-    change_column(data2, 2, z_change, 'z_change', context, False)
+    change_column(data2, 0, x_change, 'patas.draw.heatmap.x_change', context)
+    change_column(data2, 1, y_change, 'patas.draw.heatmap.y_change', context)
+    change_column(data2, 2, z_change, 'patas.draw.heatmap.z_change', context, False)
 
     # Aggregate the results
     
@@ -160,30 +159,27 @@ def render_heatmap(x_column, y_column, z_column,
 
     # Create the heatmap and aggregate multiple values
 
-    heatmap = np.zeros((len(y_value_to_pos), len(x_value_to_pos)), np.float32)
-
-    reduce = REDUCE_OPTIONS[reduce]
+    heatmap  = np.zeros((len(y_value_to_pos), len(x_value_to_pos)), np.float32)
+    error    = np.zeros((len(y_value_to_pos), len(x_value_to_pos)), np.float32)
+    reductor = REDUCE_OPTIONS[r_function]
 
     for (x_value, y_value), z_values in xy_to_z_values.items():
-        # z_values = xy_to_z_values[key]
-        # x_value, y_value = key
+        
+        x_pos                 = x_value_to_pos[x_value]
+        y_pos                 = y_value_to_pos[y_value]
+        heatmap[y_pos, x_pos] = reductor(z_values)
+        error[y_pos, x_pos]   = np.std(z_values)
 
-        x_pos = x_value_to_pos[x_value]
-        y_pos = y_value_to_pos[y_value]
-
-        heatmap[y_pos, x_pos] = reduce(z_values)
+    context['R'] = heatmap
+    context['E'] = error
 
     # Create the heatmap
 
-    if not size:
-        size = DEFAULT_SIZE
-        
-    fig, ax = plt.subplots(figsize=size)
-
-    im = ax.imshow(heatmap, cmap=get_colormap(colormap))
+    fig, ax = plt.subplots(figsize=get_size(size))
+    im      = ax.imshow(heatmap, cmap=get_colormap(colormap))
 
     cbar = ax.figure.colorbar(im, ax=ax)
-    cbar.ax.set_ylabel(z_label if z_label else "Intensity", rotation=-90, va="bottom")
+    cbar.ax.set_ylabel(r_label if r_label else "Intensity", rotation=-90, va="bottom")
 
     ax.set_xticks(np.arange(len(x_value_to_pos)))
     ax.set_yticks(np.arange(len(y_value_to_pos)))
@@ -191,30 +187,16 @@ def render_heatmap(x_column, y_column, z_column,
     ax.set_xticklabels(x_values)
     ax.set_yticklabels(y_values)
 
-    if y_label:
-        ax.set_ylabel(y_label)
-    
-    if x_label:
-        ax.set_xlabel(x_label)
-
     # Draw labels for each cell
 
-    if z_format:
+    if r_format:
 
-        z_format = compile(z_format, 'z_format', 'eval')
-
-        context = {
-            'math': math,
-            'D': heatmap
-        }
+        r_format = compile(r_format, 'patas.draw.heatmap.r_format', 'eval')
 
         for y in range(len(y_value_to_pos)):
             for x in range(len(x_value_to_pos)):
 
-                context['y'] = y
-                context['x'] = x
-
-                value = eval(z_format, context)
+                value = eval(r_format, {'y':y, 'x':x, **context})
                 text = ax.text(x, y, value, ha="center", va="center", color="w")
 
     # Draw labels for x and y axis
@@ -222,12 +204,22 @@ def render_heatmap(x_column, y_column, z_column,
     plt.setp(ax.get_xticklabels(), rotation=30, ha="right", rotation_mode="anchor")
     plt.setp(ax.get_yticklabels(), rotation=30, ha="right", rotation_mode="anchor")
 
-    # Set title
+    # Set title and labels
 
     if title:
-        ax.set_title(title)
+        ax.set_title(title, pad=12)
+
+    if y_label:
+        ax.set_ylabel(y_label)
+    
+    if x_label:
+        ax.set_xlabel(x_label)
+
+    # Make figure compact
 
     fig.tight_layout()
+
+    # Save or display graphic
 
     if output_file:
         plt.savefig(output_file)
@@ -236,10 +228,11 @@ def render_heatmap(x_column, y_column, z_column,
 
 
 def render_bars(x_column, y_column, 
-                title, x_label, y_label, 
-                x_change, y_change, y_format, 
+                title, x_label, r_label, 
+                x_change, y_change, r_format, 
                 input_file, output_file, 
-                size, reduce, color, width, horizontal, gridlines, ticks, tick_format, border,
+                size, r_function, bar_color, bar_size, horizontal, show_grid, 
+                ticks, ticks_format, border, show_error,
                 verbose):
     
     src     = read_csv(input_file)
@@ -257,12 +250,15 @@ def render_bars(x_column, y_column,
 
     context = {
         'math': math,
+        'np': np,
+        'H':headers,
+        'C':data,
         'X':data2[:,0],
         'Y':data2[:,1],
     }
 
-    change_column(data2, 0, x_change, 'x_change', context)
-    change_column(data2, 1, y_change, 'y_change', context, False)
+    change_column(data2, 0, x_change, 'patas.draw.bars.x_change', context)
+    change_column(data2, 1, y_change, 'patas.draw.bars.y_change', context, False)
 
     # Reduce values
     
@@ -277,52 +273,56 @@ def render_bars(x_column, y_column,
 
     # Create the heatmap and aggregate multiple values
 
-    y_data = np.zeros((len(x_value_to_pos),), np.float32)
-    reduce   = REDUCE_OPTIONS[reduce]
+    y_data   = np.zeros((len(x_value_to_pos),), np.float32)
+    y_err    = np.zeros((len(x_value_to_pos),), np.float32)
+    reductor = REDUCE_OPTIONS[r_function]
 
     for x_value, y_values in x_to_y_values.items():
-        x_pos = x_value_to_pos[x_value]
-        y_data[x_pos] = reduce(y_values)
+
+        x_pos         = x_value_to_pos[x_value]
+        y_data[x_pos] = reductor(y_values)
+        y_err[x_pos]  = np.std(y_values)
+
+    context['R'] = y_data
+    context['E'] = y_err
 
     # Create the graphic
 
     fig, ax = plt.subplots(figsize = get_size(size))
 
-    # Add annotation to bars
-
-    if y_format:
-        for i in ax.patches:
-            plt.text(i.get_width() + 0.2, 
-                     i.get_y() + 0.5,
-                     str(round((i.get_width()), 2)),
-                     fontsize = 10, 
-                     fontweight = 'bold',
-                     color = 'grey')
-    
     # Show Gridlines
 
-    if gridlines:
-        ax.grid(visible=True, 
-                color='grey',
-                linestyle='-.', 
-                linewidth=0.5,
-                alpha=0.2)
+    if show_grid:
+        ax.grid(visible=True, color='grey', linestyle='-.', linewidth=0.5, alpha=0.2)
     
     # Creating the bar plot
 
+    bar_color = get_color(bar_color)
+    bar_size  = get_width(bar_size)
+    error     = None if r_function != 'mean' or not show_error else y_err
+
     if horizontal:
-        ax.barh(x_data, y_data, color=get_color(color), height=get_width(width))
+        bars = ax.barh(x_data, y_data, yerr=error, color=bar_color, height=bar_size)
     else:
-        ax.bar(x_data, y_data, color=get_color(color), width=get_width(width))
+        bars = ax.bar(x_data, y_data, yerr=error, color=bar_color, width=bar_size)
+    
+    # Add annotation to bars
+
+    if r_format:
+        r_format  = compile('f"{' + r_format + '}"', 'patas.draw.bars.r_format', 'eval')
+        bar_label = [eval(r_format, {'i':i, **context}) for i in range(y_data.shape[0])]
+        ax.bar_label(bars, bar_label)
+    
+    # Add title and axis labels
+
+    if title:
+        plt.title(title, pad=12)
     
     if x_label:
         plt.xlabel(x_label)
     
-    if y_label:
-        plt.ylabel(y_label)
-    
-    if title:
-        plt.title(title)
+    if r_label:
+        plt.ylabel(r_label)
     
     # Hide box
 
@@ -338,26 +338,28 @@ def render_bars(x_column, y_column,
 
     tick_function = plt.xticks if horizontal else plt.yticks
 
-    if tick_format:
-        tick_format = compile('f"{' + tick_format + '}"', 'tick_format', 'eval')
+    if ticks_format:
+        ticks_format = compile('f"{' + ticks_format + '}"', 'patas.draw.bars.tick_format', 'eval')
     
     if ticks:
-        lowest      = np.min(y_data)
-        highest     = np.max(y_data)
-        step        = (highest - lowest) / (ticks - 1)
-        tick_values = np.arange(lowest, highest + step / 2, step)
+        lowest       = np.min(y_data)
+        highest      = np.max(y_data)
+        step         = (highest - lowest) / (ticks - 1)
+        tick_values  = np.arange(lowest, highest + step / 2, step)
+        context['T'] = tick_values
 
-        if tick_format:
-            tick_labels = [eval(tick_format, {'t':t}) for t in tick_values]
+        if ticks_format:
+            tick_labels = [eval(ticks_format, {'i':i, **context}) for i in range(tick_values.shape[0])]
             tick_function(ticks=tick_values, labels=tick_labels)
             
         else:
             tick_labels = [str(t) for t in tick_values]
             tick_function(ticks=tick_values, labels=tick_labels)
         
-    elif tick_format:
-        tick_values, _ = tick_function()
-        tick_labels = [eval(tick_format, {'t':t}) for t in tick_values]
+    elif ticks_format:
+        tick_values  = tick_function()[0]
+        context['T'] = tick_values
+        tick_labels  = [eval(ticks_format, {'i':i, **context}) for i in range(tick_values.shape[0])]
         tick_function(ticks=tick_values, labels=tick_labels)
 
     # Remove borders and display/save
