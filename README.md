@@ -1,53 +1,14 @@
 # Patas 🐾
 
-Patas is a command line utility designed to execute any program in parallel and collect its output, varying its input parameters and starting the programs automatically. The script may be parallelized on your local machine or in a cluster. The only requirement to run it on a cluster is an SSH connection between the machines. Assuming the programs are located on each worker machine, patas can start and manage the parallel programs with one command. Parsing the outputs is done in a second command. Its name means PArser and TAsk Scheduler.
+Patas is a command line utility designed to execute any program in parallel and collect its output, varying its input parameters and starting the programs automatically. The script may be parallelized on your local machine or in a cluster. The only requirement to run it on a cluster is an SSH connection between the machines. Assuming the programs are located on each worker machine, patas can start and manage the parallel programs with one command. Parsing the outputs is done in a second command. Its name means PArser and TAsk Scheduler. You can install it using pip with the following command.
 
-# When should I use Patas? ⭐
-
-Use this program if you want to evaluate your model against multiple parameters and measure your own performance metrics. It is a quick way to parallelize an experiment over various machines. It is also handy when you don't want to, or can't, change the original program.
-
-# When should I not use Patas? 🚧
-
-Patas is designed to be a simple command line utility. It will not manage and constrain resource usage, like limiting the amount of RAM, cores, or disk used by the process. The only control available is the number of workers in each machine, representing how many processes we want to execute in the given machine. The reason for this is that when we constrain the process with a given amount of resources, like RAM, it's possible that a process will run out of memory, and the entire system has plenty of it available. The workaround is to estimate the number of workers based on how many resources your program needs. If a machine crashes, its ok, you can stop and execute patas again. It will skip completed tasks and continue from where it stopped.
-
-# Concepts
-
-## Sub commands
-
-* `patas explore` - command to execute programs in parallel and collect their stouts. It will combine multiple variables and use each combination as input parameter.
-
-* `patas parse` - used to parse the programs stout and consolidate them in a single csv file. It uses regular expressions to locate the metrics that must be collected.
-
-* `patas query` - apply sql queries directly into the generated csv files.
-
-* `patas draw` - convert your csv files to graphics for quick visualization.
-
-## Internal concepts
-
-* `Experiment` - represents an execution and the stdout generated. Its configuration parameters include mainly the command lines to be executed and input variables.
-
-* `Command` - the command line that paths will use to start the application. It contains variable fields that will be replaced by variable values by patas.
-
-* `Combination` - represents one possible combination of input variables. If you define two variables, each with 5 possible values, you will end with 25 combinations.
-
-* `Task` - represents a single program execution. If you have 25 combinations and the experiment is configured to repeat each of them 10 times, the number of tasks in the experiment is 250.
-
-* `Node` - a machine that will run the experiment, hosting the number of workers selected for it.
-
-* `Cluster` - a set of nodes. May contain special tags that will allow us to filter them during an experiment.
-
-* `Scheduler` - an internal object responsible for orchestrating the tasks and associating them to a worker.
-
-* `Worker` - represents the maximum number of parallel processes that may run at once in a node. A node may have one or more workers running in parallel.
-
-* `Variable` - an input parameter for the program. This is typically a list of values that will be combined with other variables and defines the number of tasks that will be created.
-
-* `Pattern` - a regex containing a single group that will capture an output variable, i.e., a metric.
-
+```shell
+pip install patas
+```
 
 # Basic usage 🐣
 
-Considering a use case that we need to find the optimal configuration for a neural network. In this case we are interested in variating the number of hidden neurons and the activation function in the hidden layer. We want to execute our prgoram multiple times, combining the values of these two parameters, and collect metrics of interest, like train and test accuracies. We then want to analyse this output and select the best configuration. The following subsections will describe how to achieve this.
+Considering the use case that we need to find the optimal configuration for a neural network. In this case we are interested in variating the number of hidden neurons and the activation function in the hidden layer. We want to execute our prgoram multiple times, combining the values of these two parameters, and collect metrics of interest, like train and test accuracies. We then want to analyse this output and select the best configuration. The following subsections will describe how to achieve this.
 
 ## The program
 
@@ -262,25 +223,49 @@ patas draw lines \
 
 ![Extended lines example](https://github.com/diegofps/patas/blob/main/docs/images/lines2.png?raw=true)
 
-# TL;DR 💻
+# Documentation 📚
 
-```shell
-# Parallelizing a program in the local machine. Use the local directory as workdir
-patas explore grid \
-    --cmd './main.py {neurons} {activation}' \
-    --vl neurons 5 10 15 20 25 30 \
-    --vl activation relu leaky_relu sigmoid tanh \
-    --repeat 2
+## When should I use Patas? ⭐
 
-# Parsing the program output
-patas parse \
-    -e 'pandasout/grid/' \
-    -p TRAIN_ACC  'Train accuracy: (@float@)' \
-    -p TEST_ACC   'Test accuracy:  (@float@)'
+Use this program if you want to evaluate your model against multiple parameters and measure your own performance metrics. It is a quick way to parallelize an experiment over various machines. It is also handy when you don't want to, or can't, change the original program.
 
-# Query CSV experiment files using SQL
-patas query 'select * from grid' -m
-```
+## When should I not use Patas? 🚧
+
+Patas is designed to be a simple command line utility. It will not manage and constrain resource usage, like limiting the amount of RAM, cores, or disk used by the process. The only control available is the number of workers in each machine, representing how many processes we want to execute in the given machine. The reason for this is that when we constrain the process with a given amount of resources, like RAM, it's possible that a process will run out of memory, and the entire system has plenty of it available. The workaround is to estimate the number of workers based on how many resources your program needs. If a machine crashes, its ok, you can stop and execute patas again. It will skip completed tasks and continue from where it stopped.
+
+## Concepts
+
+### Sub commands
+
+* `patas explore` - command to execute programs in parallel and collect their stouts. It will combine multiple variables and use each combination as input parameter.
+
+* `patas parse` - used to parse the programs stout and consolidate them in a single csv file. It uses regular expressions to locate the metrics that must be collected.
+
+* `patas query` - apply sql queries directly into the generated csv files.
+
+* `patas draw` - convert your csv files to graphics for quick visualization.
+
+### Internal concepts
+
+* `Experiment` - represents an execution and the stdout generated. Its configuration parameters include mainly the command lines to be executed and input variables.
+
+* `Command` - the command line that paths will use to start the application. It contains variable fields that will be replaced by variable values by patas.
+
+* `Combination` - represents one possible combination of input variables. If you define two variables, each with 5 possible values, you will end with 25 combinations.
+
+* `Task` - represents a single program execution. If you have 25 combinations and the experiment is configured to repeat each of them 10 times, the number of tasks in the experiment is 250.
+
+* `Node` - a machine that will run the experiment, hosting the number of workers selected for it.
+
+* `Cluster` - a set of nodes. May contain special tags that will allow us to filter them during an experiment.
+
+* `Scheduler` - an internal object responsible for orchestrating the tasks and associating them to a worker.
+
+* `Worker` - represents the maximum number of parallel processes that may run at once in a node. A node may have one or more workers running in parallel.
+
+* `Variable` - an input parameter for the program. This is typically a list of values that will be combined with other variables and defines the number of tasks that will be created.
+
+* `Pattern` - a regex containing a single group that will capture an output variable, i.e., a metric.
 
 # Source Code 🎼
 
