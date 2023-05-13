@@ -218,6 +218,25 @@ patas draw bars \
 
 ### Lines
 
+```shell
+patas draw lines \
+    --title "Testing Title" \
+    --x-label "x axis" \
+    --y-label "y axis" \
+    --size 10 2 \
+    --show-grid \
+    --border none \
+    \
+    --new-line \
+    --x-column in_neurons \
+    --y-column out_test_acc \
+    \
+    --new-line \
+    --x-column in_neurons \
+    --y-column out_train_acc
+
+```
+
 TODO
 
 ![Bars example](https://github.com/diegofps/patas/blob/main/docs/images/lines1.png?raw=true)

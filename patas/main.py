@@ -247,7 +247,12 @@ def do_draw_heatmap(argv):
 
 
 def do_draw_lines(argv):
-    abort("Draw lines is not implemented yet.")
+    
+    from patas import graphics
+
+    args = argparsers.parse_patas_draw_lines(argv)
+
+    graphics.render_lines()
 
 
 def do_draw_lines_3d(argv):
@@ -315,6 +320,8 @@ def help_draw_syntax():
 
 
 def main(*params):
+
+    # parser.add_subparsers()
 
     args = sys.argv[1:]
 

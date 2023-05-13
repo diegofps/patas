@@ -1,5 +1,7 @@
 import argparse
-
+from argparse import ArgumentParser, Namespace
+from collections.abc import Sequence
+from typing import Any
 
 DEFAULT_PATAS_OUTPUT_DIR = './patasout'
 
@@ -232,7 +234,7 @@ def parse_patas_draw_heatmap(argv):
 
     parser = argparse.ArgumentParser(
                         prog='patas draw heatmap',
-                        description='Draws a heatmap from the input data',
+                        description='Draws a heatmap from a csv file',
                         epilog="Check the README.md to learn more tips on how to use this feature: https://github.com/diegofps/patas/blob/main/README.md",
                         formatter_class=argparse.RawDescriptionHelpFormatter)
 
@@ -368,8 +370,8 @@ def parse_patas_draw_heatmap(argv):
 def parse_patas_draw_bars(argv):
 
     parser = argparse.ArgumentParser(
-                        prog='patas draw bas',
-                        description='Draws bars from the input data',
+                        prog='patas draw bars',
+                        description='Draws bars from a csv file',
                         epilog="Check the README.md to learn more tips on how to use this feature: https://github.com/diegofps/patas/blob/main/README.md",
                         formatter_class=argparse.RawDescriptionHelpFormatter)
 
@@ -521,3 +523,231 @@ def parse_patas_draw_bars(argv):
                         action='store_true')
 
     return parser.parse_args(args=argv)
+
+def parse_patas_draw_lines(argv):
+
+    parser = ArgumentParser2(
+                        prog='patas draw lines',
+                        description='Draws lines from a csv file',
+                        epilog="Check the README.md to learn more tips on how to use this feature: https://github.com/diegofps/patas/blob/main/README.md",
+                        formatter_class=argparse.RawDescriptionHelpFormatter)
+
+    # INITIAL PARAMETERS
+
+    parser.add_argument('--input', 
+                        type=str, 
+                        required=True, 
+                        metavar='FILEPATH',
+                        dest='input_file',
+                        help='filepath to the csv file containing the data',
+                        action='store')
+
+    queue = parser.add_argument('--new-line', 
+                        help='begin definition of a new line',
+                        action='queue')
+
+    parser.add_argument('--x-column', 
+                        type=str, 
+                        dest='x_column',
+                        metavar='X_COLUMN',
+                        help='name of the x column in the data source',
+                        action='store',
+                        queue=queue)
+
+    parser.add_argument('--y-column', 
+                        type=str, 
+                        metavar='Y_COLUMN',
+                        dest='y_column',
+                        help='name of the y column in the data source',
+                        action='store',
+                        queue=queue)
+
+    parser.add_argument('--title', 
+                        type=str, 
+                        dest='title',
+                        metavar='FILEPATH',
+                        help='title of the graphic',
+                        action='store')
+
+    parser.add_argument('--x-label', 
+                        type=str, 
+                        metavar='L',
+                        dest='x_label',
+                        help='label for the x axis',
+                        action='store')
+
+    parser.add_argument('--y-label', 
+                        type=str, 
+                        dest='y_label',
+                        metavar='L',
+                        help='label for the reduced values',
+                        action='store')
+
+    parser.add_argument('--output', 
+                        type=str, 
+                        metavar='FILEPATH',
+                        dest='output_file',
+                        help='filepath of output file to save the image. If not present, the result will be displayed',
+                        action='store')
+
+    # parser.add_argument('--x-change', 
+    #                     type=str, 
+    #                     metavar='CODE',
+    #                     dest='x_change',
+    #                     help='transforms the x column using the variables X, Y, Z, math, and i. For example: --x-change "math.log2(X[i])"',
+    #                     action='store')
+
+    # parser.add_argument('--y-change', 
+    #                     type=str, 
+    #                     metavar='CODE',
+    #                     dest='y_change',
+    #                     help='transforms the y column using the variables X, Y, Z, math, and i. For example: --y-change "math.log2(Y[i])"',
+    #                     action='store')
+
+    # parser.add_argument('--r-function', 
+    #                     type=str, 
+    #                     choices=('sum', 'mean', 'std', 'product', 'min', 'max'),
+    #                     default='mean',
+    #                     dest='r_function',
+    #                     metavar='NAME',
+    #                     help='each x value will usualy map to multiple values, this function defines how to reduce them.',
+    #                     action='store')
+
+    # parser.add_argument('--r-format', 
+    #                     type=str,  
+    #                     metavar='CODE',
+    #                     dest='r_format',
+    #                     help='formats reduced values for display. Example: --r-format \'int(D[x]*100)\'',
+    #                     action='store')
+
+    parser.add_argument('--size', 
+                        type=float, 
+                        nargs=2, 
+                        dest='size',
+                        metavar='W H',
+                        help='size of output image',
+                        action='store')
+
+    parser.add_argument('--verbose', 
+                        help='print extra info during execution',
+                        action='store_true')
+
+    parser.add_argument('--border', 
+                        type=str,
+                        choices=('all', 'ticks', 'lines', 'none'),
+                        dest='border',
+                        metavar='MODE',
+                        help='style of the border, default is all',
+                        action='store')
+
+    parser.add_argument('--ticks', 
+                        type=int, 
+                        dest='ticks',
+                        metavar='T',
+                        help='number of values to appear in the axis',
+                        action='store')
+
+    parser.add_argument('--ticks-format', 
+                        type=str,  
+                        metavar='CODE',
+                        dest='ticks_format',
+                        help='formats tick display value using its current value t. Example: --ticks-format \'t:02f\'',
+                        action='store')
+
+    # parser.add_argument('--horizontal', 
+    #                     dest='horizontal', 
+    #                     help='set this flag if you want horizontal bars',
+    #                     action='store_true')
+
+    parser.add_argument('--show-grid', 
+                        dest='show_grid', 
+                        help='set this flag if you want gridlines displayed', 
+                        action='store_true')
+
+    parser.add_argument('--show-error',  
+                        dest='show_error',
+                        help='set this flag if you want the standard deviation to be shown',
+                        action='store_true')
+
+    args = parser.parse_args(args=argv)
+
+    print(args)
+    
+    return args
+
+
+class ArgumentParser2(argparse.ArgumentParser):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.dest_to_queue = {}
+        self.queues = {}
+
+    def add_argument(self, *args, **params):
+        if 'queue' in params:
+            queue = params.pop('queue')
+            action = super().add_argument(*args, **params)
+            queue.intercept(action)
+            return action
+        
+        elif 'action' in params and params['action'] == 'queue':
+            queue = NamespaceQueue(self)
+            params['action'] = queue
+            action = super().add_argument(*args, **params)
+            self.dest_to_queue[action.dest] = queue
+            return queue
+        
+        else:
+            return super().add_argument(*args, **params)
+
+    def parse_args(self, *args, **kwargs):
+        args = super().parse_args(*args, **kwargs)
+        for k,v in self.dest_to_queue.items():
+            args.__dict__[k] = v._namespaces
+        return args
+
+
+class NamespaceQueue:
+
+    class _Stepper(argparse.Action):
+        def __init__(self, nq, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.nargs = 0
+            self.nq = nq
+        
+        def __call__(self, *args, **kwargs):
+            if self.nq._namespaces[-1].__dict__:
+                self.nq._namespaces.append(argparse.Namespace())
+            return self
+    
+    def _class_call(self, parser, namespace, values, option_string=None, **kwargs):
+        if hasattr(self, '__custom_call__'):
+            method = getattr(self, '__custom_call__')
+            method(self, parser, namespace, values, option_string, **kwargs)
+        
+        elif hasattr(self.__class__, '__old_call__'):
+            method = getattr(self.__class__, '__old_call__')
+            method(self, parser, namespace, values, option_string, **kwargs)
+
+    def __init__(self, parser):
+        self._namespaces = [argparse.Namespace()]
+        self._parser = parser
+    
+    def intercept(self, action):
+        
+        nq = self
+        def _custom_call(self, parser, namespace, values, option_string=None, **kwargs):
+            if hasattr(self.__class__, '__old_call__'):
+                method = getattr(self.__class__, '__old_call__')
+                method(self, parser, nq._namespaces[-1], values, option_string=None, **kwargs)
+                
+        if not hasattr(action.__class__, '__old_call__'):
+            old_call = getattr(action.__class__, '__call__')
+            setattr(action.__class__, '__old_call__', old_call)
+            setattr(action.__class__, '__call__', NamespaceQueue._class_call)
+            
+        if not hasattr(action, '__custom_call__'):
+            setattr(action, '__custom_call__', _custom_call)
+            
+    def __call__(self, *args, **kwargs):
+        return NamespaceQueue._Stepper(self, *args, **kwargs)
