@@ -532,7 +532,8 @@ def parse_patas_draw_lines(argv):
                         epilog="Check the README.md to learn more tips on how to use this feature: https://github.com/diegofps/patas/blob/main/README.md",
                         formatter_class=argparse.RawDescriptionHelpFormatter)
 
-    # INITIAL PARAMETERS
+
+    # GENERAL PARAMETERS
 
     parser.add_argument('--input', 
                         type=str, 
@@ -541,26 +542,6 @@ def parse_patas_draw_lines(argv):
                         dest='input_file',
                         help='filepath to the csv file containing the data',
                         action='store')
-
-    line = parser.add_argument('--new-line', 
-                        help='begin definition of a new line',
-                        action='create_context')
-
-    parser.add_argument('--x-column', 
-                        type=str, 
-                        dest='x_column',
-                        metavar='X_COLUMN',
-                        help='name of the x column in the data source',
-                        action='store',
-                        context=line)
-
-    parser.add_argument('--y-column', 
-                        type=str, 
-                        metavar='Y_COLUMN',
-                        dest='y_column',
-                        help='name of the y column in the data source',
-                        action='store',
-                        context=line)
 
     parser.add_argument('--title', 
                         type=str, 
@@ -576,9 +557,9 @@ def parse_patas_draw_lines(argv):
                         help='label for the x axis',
                         action='store')
 
-    parser.add_argument('--y-label', 
+    parser.add_argument('--r-label', 
                         type=str, 
-                        dest='y_label',
+                        dest='r_label',
                         metavar='L',
                         help='label for the reduced values',
                         action='store')
@@ -589,36 +570,6 @@ def parse_patas_draw_lines(argv):
                         dest='output_file',
                         help='filepath of output file to save the image. If not present, the result will be displayed',
                         action='store')
-
-    # parser.add_argument('--x-change', 
-    #                     type=str, 
-    #                     metavar='CODE',
-    #                     dest='x_change',
-    #                     help='transforms the x column using the variables X, Y, Z, math, and i. For example: --x-change "math.log2(X[i])"',
-    #                     action='store')
-
-    # parser.add_argument('--y-change', 
-    #                     type=str, 
-    #                     metavar='CODE',
-    #                     dest='y_change',
-    #                     help='transforms the y column using the variables X, Y, Z, math, and i. For example: --y-change "math.log2(Y[i])"',
-    #                     action='store')
-
-    # parser.add_argument('--r-function', 
-    #                     type=str, 
-    #                     choices=('sum', 'mean', 'std', 'product', 'min', 'max'),
-    #                     default='mean',
-    #                     dest='r_function',
-    #                     metavar='NAME',
-    #                     help='each x value will usualy map to multiple values, this function defines how to reduce them.',
-    #                     action='store')
-
-    # parser.add_argument('--r-format', 
-    #                     type=str,  
-    #                     metavar='CODE',
-    #                     dest='r_format',
-    #                     help='formats reduced values for display. Example: --r-format \'int(D[x]*100)\'',
-    #                     action='store')
 
     parser.add_argument('--size', 
                         type=float, 
@@ -654,10 +605,14 @@ def parse_patas_draw_lines(argv):
                         help='formats tick display value using its current value t. Example: --ticks-format \'t:02f\'',
                         action='store')
 
-    # parser.add_argument('--horizontal', 
-    #                     dest='horizontal', 
-    #                     help='set this flag if you want horizontal bars',
-    #                     action='store_true')
+    parser.add_argument('--legend-location', 
+                        type=str, 
+                        choices=('tr', 'tl', 'bl', 'br', 'cr', 'cl', 'tc', 'bc', 'cc', 'c'),
+                        default=None,
+                        dest='legend_location',
+                        metavar='YX',
+                        help='Position of the legend (t=top, b=bottom, c=center, r=right, l=left)',
+                        action='store')
 
     parser.add_argument('--show-grid', 
                         dest='show_grid', 
@@ -668,6 +623,89 @@ def parse_patas_draw_lines(argv):
                         dest='show_error',
                         help='set this flag if you want the standard deviation to be shown',
                         action='store_true')
+
+
+    # LINE PARAMETERS
+
+    parser.add_argument_group('Line parameters')
+
+    lines = parser.add_argument('--new-line', 
+                                dest='lines',
+                                help='begin definition of a new line',
+                                action='create_context')
+
+    parser.add_argument('--x-column', 
+                        type=str, 
+                        dest='x_column',
+                        metavar='X_COLUMN',
+                        help='name of the x column in the data source',
+                        action='store',
+                        context=lines)
+
+    parser.add_argument('--y-column', 
+                        type=str, 
+                        metavar='Y_COLUMN',
+                        dest='y_column',
+                        help='name of the y column in the data source',
+                        action='store',
+                        context=lines)
+
+    parser.add_argument('--x-change', 
+                        type=str, 
+                        metavar='CODE',
+                        dest='x_change',
+                        default=None,
+                        help='transforms the x column. For example: --x-change "math.log2(X[i])"',
+                        action='store',
+                        context=lines)
+
+    parser.add_argument('--y-change', 
+                        type=str, 
+                        metavar='CODE',
+                        dest='y_change',
+                        help='transforms the y column. For example: --y-change "math.log2(Y[i])"',
+                        action='store',
+                        context=lines)
+
+    parser.add_argument('--r-function', 
+                        type=str, 
+                        choices=('sum', 'mean', 'std', 'product', 'min', 'max'),
+                        default='mean',
+                        dest='r_function',
+                        metavar='NAME',
+                        help='each x value will usualy map to multiple values, this function defines how to reduce them.',
+                        action='store',
+                        context=lines)
+
+    parser.add_argument('--label', 
+                        type=str, 
+                        dest='label',
+                        metavar='NAME',
+                        help='label representing this line in the legend',
+                        action='store',
+                        context=lines)
+
+    parser.add_argument('--style', 
+                        type=str, 
+                        choices=('solid', 'dash', 'dashdot', 'dot'),
+                        default='solid',
+                        dest='style',
+                        metavar='NAME',
+                        help='style used to draw the line',
+                        action='store',
+                        context=lines)
+
+    parser.add_argument('--marker', 
+                        type=str, 
+                        choices=('point', 'circle', 'x', 'diamond', 'hexagon', 'square', 'plus'),
+                        default='point',
+                        dest='marker',
+                        metavar='NAME',
+                        help='marker used to highlight the points in the line',
+                        action='store',
+                        context=lines)
+
+
 
     args = parser.parse_args(args=argv)
 
@@ -706,6 +744,7 @@ class ArgumentParser2(argparse.ArgumentParser):
             args.__dict__[dest] = context.instances
         return args
 
+
 class ArgContextInstance(argparse.Namespace):
     def __init__(self):
         super().__init__()
@@ -714,11 +753,17 @@ class ArgContextInstance(argparse.Namespace):
 class ArgContextClass:
 
     def __init__(self, parser):
-        self._instances = [ArgContextInstance()]
+        self._instances = []
+        self._intercepting = []
         self._parser = parser
+    
+    def any(self):
+        return any(self._instances)
     
     @property
     def instance(self):
+        if not self._instances:
+            self.create_instance()
         return self._instances[-1]
     
     @property
@@ -726,15 +771,19 @@ class ArgContextClass:
         return self._instances
     
     def create_instance(self):
-        self._instances.append(ArgContextInstance())
-    
+        instance = ArgContextInstance()
+        self._instances.append(instance)
+
+        for action in self._intercepting:
+            instance.__dict__[action.dest] = action.default
+
     def intercept(self, action):
         
-        nq = self
+        context_class = self
         def _custom_call(self, parser, namespace, values, option_string=None, **kwargs):
             if hasattr(self.__class__, '__old_call__'):
                 method = getattr(self.__class__, '__old_call__')
-                method(self, parser, nq.instance, values, option_string=None, **kwargs)
+                method(self, parser, context_class.instance, values, option_string=None, **kwargs)
                 
         if not hasattr(action.__class__, '__old_call__'):
             old_call = getattr(action.__class__, '__call__')
@@ -743,6 +792,8 @@ class ArgContextClass:
             
         if not hasattr(action, '__custom_call__'):
             setattr(action, '__custom_call__', _custom_call)
+        
+        self._intercepting.append(action)
             
     def __call__(self, *args, **kwargs):
         return ArgContextClass._Stepper(self, *args, **kwargs)
@@ -754,7 +805,7 @@ class ArgContextClass:
             self.nargs = 0
         
         def __call__(self, *args, **kwargs):
-            if self.context.instance.__dict__:
+            if self.context.any():
                 self.context.create_instance()
             return self
     

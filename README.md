@@ -220,13 +220,7 @@ patas draw bars \
 
 ```shell
 patas draw lines \
-    --title "Testing Title" \
-    --x-label "x axis" \
-    --y-label "y axis" \
-    --size 10 2 \
-    --show-grid \
-    --border none \
-    \
+    --input patasout/grid/grid.csv \
     --new-line \
     --x-column in_neurons \
     --y-column out_test_acc \
@@ -234,7 +228,30 @@ patas draw lines \
     --new-line \
     --x-column in_neurons \
     --y-column out_train_acc
+```
 
+```shell
+patas draw lines \
+    --input patasout/grid/grid.csv \
+    --title "Testing Title" \
+    --x-label "x axis" \
+    --r-label "y axis" \
+    --size 10 2 \
+    --show-grid \
+    --border none \
+    --ticks 5 \
+    --ticks-format 'T[i]:.2f' \
+    --legend-location tr \
+    \
+    --new-line \
+    --label 'Test accuracy' \
+    --x-column in_neurons \
+    --y-column out_test_acc \
+    \
+    --new-line \
+    --label 'Train accuracy' \
+    --x-column in_neurons \
+    --y-column out_train_acc
 ```
 
 TODO

@@ -252,8 +252,17 @@ def do_draw_lines(argv):
 
     args = argparsers.parse_patas_draw_lines(argv)
 
-    graphics.render_lines()
+    lines = [
+        (line.x_column, line.y_column, line.x_change, line.y_change, line.r_function, line.label, line.style, line.marker) 
+        for line in args.lines
+    ]
 
+    graphics.render_lines(lines, args.title, args.size, 
+                          args.x_label, args.r_label, 
+                          args.input_file, args.output_file, 
+                          args.show_grid, args.border, args.show_error, 
+                          args.ticks, args.ticks_format, args.legend_location,
+                          args.verbose)
 
 def do_draw_lines_3d(argv):
     abort("Draw lines_3d is not implemented yet.")

@@ -372,5 +372,195 @@ def render_bars(x_column, y_column,
         plt.show()
 
 
-def render_lines():
-    pass
+def render_lines(lines, title, size, 
+                 x_label, r_label, 
+                 input_file, output_file, 
+                 show_grid, border, show_error, 
+                 ticks, ticks_format, legend_location,
+                 verbose):
+    
+    src     = read_csv(input_file)
+    headers = src[0,:]
+    data    = src[1:,:]
+
+    # Create the graphic
+
+    fig, ax = plt.subplots(figsize = get_size(size))
+
+    # Show Gridlines
+
+    if show_grid:
+        ax.grid(visible=True, color='grey', linestyle='-.', linewidth=0.5, alpha=0.2)
+    
+    # Draw lines
+
+    lowest_values = []
+    highest_values = []
+    labels = []
+
+    for x_column, y_column, x_change, y_change, r_function, label, style, marker in lines:
+
+        labels.append(label if label else y_column)
+
+        # Locate headers and isolate the parse the data into a new matrix
+
+        x_index = find_column(headers, x_column)
+        y_index = find_column(headers, y_column)
+
+        data2 = np.array([data[:,x_index], data[:,y_index].astype(float)], dtype='object').transpose()
+
+        # Apply transformations
+
+        context = {
+            'math': math,
+            'np': np,
+            'H':headers,
+            'C':data,
+            'X':data2[:,0],
+            'Y':data2[:,1],
+        }
+
+        change_column(data2, 0, x_change, 'patas.draw.bars.x_change', context)
+        change_column(data2, 1, y_change, 'patas.draw.bars.y_change', context, False)
+
+        # Reduce values
+        
+        x_to_y_values = defaultdict(list)
+
+        for y in range(data2.shape[0]):
+            x_value = data2[y, 0]
+            y_value = data2[y, 1]
+            x_to_y_values[x_value].append(y_value)
+
+        x_value_to_pos, x_data = find_all_values(data2[:,0])
+
+        # Create the heatmap and aggregate multiple values
+
+        y_data   = np.zeros((len(x_value_to_pos),), np.float32)
+        y_err    = np.zeros((len(x_value_to_pos),), np.float32)
+        reductor = REDUCE_OPTIONS[r_function]
+
+        for x_value, y_values in x_to_y_values.items():
+
+            x_pos         = x_value_to_pos[x_value]
+            y_data[x_pos] = reductor(y_values)
+            y_err[x_pos]  = np.std(y_values)
+
+        context['R'] = y_data
+        context['E'] = y_err
+
+        # Build the style string
+
+        marker = {'point':'.', 'circle':'o', 'x':'x', 'diamond':'D', 'hexagon':'H', 'square':'s', 'plus':'+'}[marker] if marker else '.'
+        style = {'solid':'-', 'dash':'--', 'dashdot':'-.', 'dot':':'}[style] if style else '-'
+        plot_style = marker + style
+
+        # Create the bar plot for each line
+
+        ax.plot(x_data, y_data, plot_style)
+
+        # Update the lowest and highest values
+        
+        lowest_values.append(np.min(y_data))
+        highest_values.append(np.max(y_data))
+
+    lowest_value  = min(lowest_values)
+    highest_value = max(highest_values)
+    
+    # bar_color = get_color(bar_color)
+    # bar_size  = get_width(bar_size)
+    # error     = None if r_function != 'mean' or not show_error else y_err
+
+    # if horizontal:
+    #     bars = ax.barh(x_data, y_data, yerr=error, color=bar_color, height=bar_size)
+    # else:
+    #     bars = ax.bar(x_data, y_data, yerr=error, color=bar_color, width=bar_size)
+    
+    # Add annotation to bars
+
+    # if r_format:
+    #     r_format  = compile('f"{' + r_format + '}"', 'patas.draw.bars.r_format', 'eval')
+    #     bar_label = [eval(r_format, {'i':i, **context}) for i in range(y_data.shape[0])]
+    #     ax.bar_label(bars, bar_label)
+    
+    # Add title and axis labels
+
+    if title:
+        plt.title(title, pad=12)
+    
+    if x_label:
+        plt.xlabel(x_label)
+    
+    if r_label:
+        plt.ylabel(r_label)
+    
+    # Position legend in the figure
+
+    if legend_location or any([x[5] for x in lines]):
+        if legend_location:
+            legend_location = {
+                'tr': 'upper right',
+                'tl': 'upper left',
+                'br': 'lower right',
+                'bl': 'lower left',
+                'cr': 'center right',
+                'cl': 'center left',
+                'tc': 'upper center',
+                'bc': 'lower center',
+                'cc': 'center',
+                'c': 'center',
+            }[legend_location]
+
+        else:
+            legend_location = 'best'
+            
+        ax.legend(labels=labels, loc=legend_location)
+    
+    # Hide box
+
+    if border in ['none', 'ticks']:
+        for s in ['top', 'bottom', 'left', 'right']:
+            ax.spines[s].set_visible(False)
+    
+    if border in ['none', 'lines']:
+        ax.xaxis.set_ticks_position('none')
+        ax.yaxis.set_ticks_position('none')
+
+    # Format ticks 
+
+    tick_function = plt.yticks #if horizontal else plt.yticks
+
+    if ticks_format:
+        ticks_format = compile('f"{' + ticks_format + '}"', 'patas.draw.bars.tick_format', 'eval')
+    
+    if ticks:
+
+        step         = (highest_value - lowest_value) / (ticks - 1)
+        tick_values  = np.arange(lowest_value, highest_value + step / 2, step)
+        context['T'] = tick_values
+
+        if ticks_format:
+            tick_labels = [eval(ticks_format, {'i':i, **context}) for i in range(tick_values.shape[0])]
+            tick_function(ticks=tick_values, labels=tick_labels)
+            
+        else:
+            tick_labels = [str(t) for t in tick_values]
+            tick_function(ticks=tick_values, labels=tick_labels)
+        
+    elif ticks_format:
+        tick_values  = tick_function()[0]
+        context['T'] = tick_values
+        tick_labels  = [eval(ticks_format, {'i':i, **context}) for i in range(tick_values.shape[0])]
+        tick_function(ticks=tick_values, labels=tick_labels)
+
+    # Remove borders and display/save
+
+    fig.tight_layout()
+
+    if output_file:
+        plt.savefig(output_file)
+    else:
+        plt.show()
+
+
+
