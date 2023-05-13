@@ -542,9 +542,9 @@ def parse_patas_draw_lines(argv):
                         help='filepath to the csv file containing the data',
                         action='store')
 
-    queue = parser.add_argument('--new-line', 
+    line = parser.add_argument('--new-line', 
                         help='begin definition of a new line',
-                        action='queue')
+                        action='create_context')
 
     parser.add_argument('--x-column', 
                         type=str, 
@@ -552,7 +552,7 @@ def parse_patas_draw_lines(argv):
                         metavar='X_COLUMN',
                         help='name of the x column in the data source',
                         action='store',
-                        queue=queue)
+                        context=line)
 
     parser.add_argument('--y-column', 
                         type=str, 
@@ -560,7 +560,7 @@ def parse_patas_draw_lines(argv):
                         dest='y_column',
                         help='name of the y column in the data source',
                         action='store',
-                        queue=queue)
+                        context=line)
 
     parser.add_argument('--title', 
                         type=str, 
@@ -684,13 +684,13 @@ class ArgumentParser2(argparse.ArgumentParser):
         self.queues = {}
 
     def add_argument(self, *args, **params):
-        if 'queue' in params:
-            context = params.pop('queue')
+        if 'context' in params:
+            context = params.pop('context')
             action = super().add_argument(*args, **params)
             context.intercept(action)
             return action
         
-        elif 'action' in params and params['action'] == 'queue':
+        elif 'action' in params and params['action'] == 'create_context':
             context = ArgContextClass(self)
             params['action'] = context
             action = super().add_argument(*args, **params)
@@ -707,10 +707,8 @@ class ArgumentParser2(argparse.ArgumentParser):
         return args
 
 class ArgContextInstance(argparse.Namespace):
-
     def __init__(self):
         super().__init__()
-        self._children = {}
 
 
 class ArgContextClass:
