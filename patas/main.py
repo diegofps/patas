@@ -253,7 +253,7 @@ def do_draw_lines(argv):
     args = argparsers.parse_patas_draw_lines(argv)
 
     lines = [
-        (line.x_column, line.y_column, line.x_change, line.y_change, line.r_function, line.label, line.style, line.marker) 
+        (line.x_column, line.y_column, line.x_change, line.y_change, line.r_function, line.label, line.style, line.marker, line.marker_size) 
         for line in args.lines
     ]
 

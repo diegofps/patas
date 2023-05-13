@@ -398,7 +398,7 @@ def render_lines(lines, title, size,
     highest_values = []
     labels = []
 
-    for x_column, y_column, x_change, y_change, r_function, label, style, marker in lines:
+    for x_column, y_column, x_change, y_change, r_function, label, style, marker, marker_size in lines:
 
         labels.append(label if label else y_column)
 
@@ -451,13 +451,34 @@ def render_lines(lines, title, size,
 
         # Build the style string
 
-        marker = {'point':'.', 'circle':'o', 'x':'x', 'diamond':'D', 'hexagon':'H', 'square':'s', 'plus':'+'}[marker] if marker else '.'
-        style = {'solid':'-', 'dash':'--', 'dashdot':'-.', 'dot':':'}[style] if style else '-'
+        if marker:
+            marker = {
+                'point':'.', 
+                'circle':'o', 
+                'x':'x', 
+                'diamond':'D', 
+                'hexagon':'H', 
+                'square':'s', 
+                'plus':'+'
+            }[marker]
+        else:
+            marker = ''
+        
+        if style:
+            style = {
+                'solid':'-', 
+                'dash':'--', 
+                'dashdot':'-.', 
+                'dot':':'
+            }[style] 
+        else:
+            style = '-'
+        
         plot_style = marker + style
 
-        # Create the bar plot for each line
+        # Draw a line 
 
-        ax.plot(x_data, y_data, plot_style)
+        ax.plot(x_data, y_data, plot_style, markersize=marker_size)
 
         # Update the lowest and highest values
         

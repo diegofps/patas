@@ -221,6 +221,7 @@ patas draw bars \
 ```shell
 patas draw lines \
     --input patasout/grid/grid.csv \
+    --size 10 2 \
     --new-line \
     --x-column in_neurons \
     --y-column out_test_acc \
@@ -229,6 +230,8 @@ patas draw lines \
     --x-column in_neurons \
     --y-column out_train_acc
 ```
+
+![Lines example](https://github.com/diegofps/patas/blob/main/docs/images/lines1.png?raw=true)
 
 ```shell
 patas draw lines \
@@ -241,22 +244,23 @@ patas draw lines \
     --border none \
     --ticks 5 \
     --ticks-format 'T[i]:.2f' \
-    --legend-location tr \
     \
     --new-line \
     --label 'Test accuracy' \
     --x-column in_neurons \
     --y-column out_test_acc \
+    --style dash \
+    --marker diamond \
     \
     --new-line \
     --label 'Train accuracy' \
     --x-column in_neurons \
-    --y-column out_train_acc
+    --y-column out_train_acc \
+    --style dot \
+    --marker circle
 ```
 
-TODO
-
-![Bars example](https://github.com/diegofps/patas/blob/main/docs/images/lines1.png?raw=true)
+![Extended lines example](https://github.com/diegofps/patas/blob/main/docs/images/lines2.png?raw=true)
 
 # TL;DR 💻
 

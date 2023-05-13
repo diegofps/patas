@@ -688,7 +688,7 @@ def parse_patas_draw_lines(argv):
     parser.add_argument('--style', 
                         type=str, 
                         choices=('solid', 'dash', 'dashdot', 'dot'),
-                        default='solid',
+                        default=None,
                         dest='style',
                         metavar='NAME',
                         help='style used to draw the line',
@@ -698,10 +698,19 @@ def parse_patas_draw_lines(argv):
     parser.add_argument('--marker', 
                         type=str, 
                         choices=('point', 'circle', 'x', 'diamond', 'hexagon', 'square', 'plus'),
-                        default='point',
+                        default=None,
                         dest='marker',
                         metavar='NAME',
                         help='marker used to highlight the points in the line',
+                        action='store',
+                        context=lines)
+
+    parser.add_argument('--marker-size', 
+                        type=float, 
+                        default=5,
+                        dest='marker_size',
+                        metavar='FLOAT',
+                        help='size of the marker',
                         action='store',
                         context=lines)
 
