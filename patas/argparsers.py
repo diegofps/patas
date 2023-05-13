@@ -680,46 +680,87 @@ class ArgumentParser2(argparse.ArgumentParser):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.dest_to_queue = {}
+        self.dest_to_context = {}
         self.queues = {}
 
     def add_argument(self, *args, **params):
         if 'queue' in params:
-            queue = params.pop('queue')
+            context = params.pop('queue')
             action = super().add_argument(*args, **params)
-            queue.intercept(action)
+            context.intercept(action)
             return action
         
         elif 'action' in params and params['action'] == 'queue':
-            queue = NamespaceQueue(self)
-            params['action'] = queue
+            context = ArgContextClass(self)
+            params['action'] = context
             action = super().add_argument(*args, **params)
-            self.dest_to_queue[action.dest] = queue
-            return queue
+            self.dest_to_context[action.dest] = context
+            return context
         
         else:
             return super().add_argument(*args, **params)
 
     def parse_args(self, *args, **kwargs):
         args = super().parse_args(*args, **kwargs)
-        for k,v in self.dest_to_queue.items():
-            args.__dict__[k] = v._namespaces
+        for dest, context in self.dest_to_context.items():
+            args.__dict__[dest] = context.instances
         return args
 
+class ArgContextInstance(argparse.Namespace):
 
-class NamespaceQueue:
+    def __init__(self):
+        super().__init__()
+        self._children = {}
+
+
+class ArgContextClass:
+
+    def __init__(self, parser):
+        self._instances = [ArgContextInstance()]
+        self._parser = parser
+    
+    @property
+    def instance(self):
+        return self._instances[-1]
+    
+    @property
+    def instances(self):
+        return self._instances
+    
+    def create_instance(self):
+        self._instances.append(ArgContextInstance())
+    
+    def intercept(self, action):
+        
+        nq = self
+        def _custom_call(self, parser, namespace, values, option_string=None, **kwargs):
+            if hasattr(self.__class__, '__old_call__'):
+                method = getattr(self.__class__, '__old_call__')
+                method(self, parser, nq.instance, values, option_string=None, **kwargs)
+                
+        if not hasattr(action.__class__, '__old_call__'):
+            old_call = getattr(action.__class__, '__call__')
+            setattr(action.__class__, '__old_call__', old_call)
+            setattr(action.__class__, '__call__', ArgContextClass._class_call)
+            
+        if not hasattr(action, '__custom_call__'):
+            setattr(action, '__custom_call__', _custom_call)
+            
+    def __call__(self, *args, **kwargs):
+        return ArgContextClass._Stepper(self, *args, **kwargs)
 
     class _Stepper(argparse.Action):
-        def __init__(self, nq, *args, **kwargs):
+        def __init__(self, context, *args, **kwargs):
             super().__init__(*args, **kwargs)
+            self.context:ArgContextClass = context
             self.nargs = 0
-            self.nq = nq
         
         def __call__(self, *args, **kwargs):
-            if self.nq._namespaces[-1].__dict__:
-                self.nq._namespaces.append(argparse.Namespace())
+            if self.context.instance.__dict__:
+                self.context.create_instance()
             return self
     
+    @staticmethod
     def _class_call(self, parser, namespace, values, option_string=None, **kwargs):
         if hasattr(self, '__custom_call__'):
             method = getattr(self, '__custom_call__')
@@ -728,26 +769,3 @@ class NamespaceQueue:
         elif hasattr(self.__class__, '__old_call__'):
             method = getattr(self.__class__, '__old_call__')
             method(self, parser, namespace, values, option_string, **kwargs)
-
-    def __init__(self, parser):
-        self._namespaces = [argparse.Namespace()]
-        self._parser = parser
-    
-    def intercept(self, action):
-        
-        nq = self
-        def _custom_call(self, parser, namespace, values, option_string=None, **kwargs):
-            if hasattr(self.__class__, '__old_call__'):
-                method = getattr(self.__class__, '__old_call__')
-                method(self, parser, nq._namespaces[-1], values, option_string=None, **kwargs)
-                
-        if not hasattr(action.__class__, '__old_call__'):
-            old_call = getattr(action.__class__, '__call__')
-            setattr(action.__class__, '__old_call__', old_call)
-            setattr(action.__class__, '__call__', NamespaceQueue._class_call)
-            
-        if not hasattr(action, '__custom_call__'):
-            setattr(action, '__custom_call__', _custom_call)
-            
-    def __call__(self, *args, **kwargs):
-        return NamespaceQueue._Stepper(self, *args, **kwargs)
