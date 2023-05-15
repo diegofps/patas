@@ -5,25 +5,19 @@ try:
 except:
     from patas import consts as c
 
-from patas.utils import error, node_cpu_count, abort
+from patas.utils import error, node_cpu_count, abort, warn
 from patas import argparsers
+from patas import schemas
 
 import sys
+
 
 BASIC_OPTIONS   = ['explore', 'parse', 'query', 'draw', 'doctor']
 DRAW_OPTIONS    = ['heatmap', 'lines', 'lines_3d', 'bars', 'bars_3d', 'boxplot', 'violin', 'scatter', 'scatter_3d', 'surface', 'pie']
 EXPLORE_OPTIONS = ['grid', 'cdeepso']
 
 
-def create_experiments(args):
-
-    from patas.schemas import Experiment, ListVariable, ArithmeticVariable, GeometricVariable, load_experiment
-
-    experiments = []
-    
-    # If experiment parameters are provided, create an experiment for them
-
-    experiment = Experiment()
+def parse_base_experiment(args, experiment:schemas.BaseExperimentSchema):
 
     if args.name:
         experiment.name = args.name
@@ -35,7 +29,7 @@ def create_experiments(args):
         experiment.workdir = args.workdir
     else:
         from os import environ
-        pwd = environ.get('PWD', None)
+        pwd  = environ.get('PWD', None)
         home = environ.get('HOME', None)
 
         if home and pwd.startswith(home):
@@ -49,14 +43,21 @@ def create_experiments(args):
     if args.max_tries:
         experiment.max_tries = args.max_tries
 
+
+def append_grid_experiment(args, experiments):
+
+    experiment = schemas.GridExperimentSchema()
+
+    parse_base_experiment(args, experiment)
+    
     for values in args.var_list:
-        var = ListVariable()
-        var.name = values[0]
+        var        = schemas.ListVariableSchema()
+        var.name   = values[0]
         var.values = values[1:]
         experiment.vars.append(var)
 
     for name, min, max, step in args.var_arithmetic:
-        var      = ArithmeticVariable()
+        var      = schemas.ArithmeticVariableSchema()
         var.name = name
         var.min  = float(min)  if '.' in min  else int(min)
         var.max  = float(max)  if '.' in max  else int(max)
@@ -65,7 +66,7 @@ def create_experiments(args):
         experiment.vars.append(var)
 
     for name, min, max, step in args.var_geometric:
-        var        = GeometricVariable()
+        var        = schemas.GeometricVariableSchema()
         var.name   = name
         var.min    = float(min)  if '.' in min  else int(min)
         var.max    = float(max)  if '.' in max  else int(max)
@@ -73,14 +74,48 @@ def create_experiments(args):
         var.update()
         experiment.vars.append(var)
 
-    if experiment.cmd or experiment.vars:
-        experiments.append(experiment)
+    if args.score_pattern:
+        warn("GridExperiment is not compatible with parameter --score-pattern")
 
+    if experiment.cmd and experiment.vars:
+        experiments.append(experiment)
+    
+    return experiments
+
+
+def append_cdeepso_experiment(args, experiments:list):
+    
+    experiment = schemas.CDEEPSOExperimentSchema()
+
+    parse_base_experiment(args, experiment)
+    
+    if args.score_pattern:
+        experiment.score = args.score_pattern
+    
+    if args.var_list:
+        warn("CdeepsoExperiment is not compatible with parameter --vl")
+
+    if args.var_arithmetic:
+        warn("CdeepsoExperiment is not compatible with parameter --va")
+
+    if args.var_geometric:
+        warn("CdeepsoExperiment is not compatible with parameter --vg")
+
+    if experiment.cmd and experiment.vars:
+        experiments.append(experiment)
+    
+    return experiments
+
+
+def load_experiments_from_files(args):
+
+    experiments = []
+    
     # If experiment files are provided, load all of them
 
     if args.experiment:
         for filepath in args.experiment:
-            experiment = load_experiment(filepath)
+            experiment = schemas.load_experiment(filepath)
             experiments.append(experiment)
     
     return experiments
@@ -88,7 +123,7 @@ def create_experiments(args):
 
 def create_clusters(args):
 
-    from patas.schemas import Cluster, Node, load_cluster
+    from patas.schemas import ClusterSchema, NodeSchema, load_cluster
 
     clusters = []
 
@@ -104,13 +139,13 @@ def create_clusters(args):
 
     if args.node:
         
-        cluster = Cluster()
+        cluster = ClusterSchema()
         cluster.name = 'cluster'
         clusters.append(cluster)
 
         for i, node_params in enumerate(args.node):
 
-            node = Node()
+            node = NodeSchema()
             node.name = f'node{i}'
 
             address      = node_params[0]
@@ -138,12 +173,12 @@ def create_clusters(args):
 
         from multiprocessing import cpu_count
 
-        node          = Node()
+        node          = NodeSchema()
         node.name     = 'localhost'
         node.hostname = 'localhost'
         node.workers  = cpu_count()
 
-        cluster       = Cluster()
+        cluster       = ClusterSchema()
         cluster.name  = 'cluster'
 
         cluster.nodes.append(node)
@@ -199,17 +234,23 @@ def create_linebreakers(args):
     return [Pattern(None, pattern) for pattern in args.linebreakers]
 
 
-def do_explore_grid(argv):
+def do_explore(argv):
 
-    from patas.grid_explorer import GridExplorer
+    from patas.scheduler import Scheduler
 
-    args         = argparsers.parse_patas_explore_grid(argv)
-    experiments  = create_experiments(args)
+    args         = argparsers.parse_patas_explore(argv)
     clusters     = create_clusters(args)
     task_filters = create_task_filters(args)
     node_filters = create_node_filters(args)
-    gridexec     = GridExplorer(task_filters, node_filters, args.output_folder, args.redo_tasks, args.confirmed, experiments, clusters)
+    experiments  = load_experiments_from_files(args)
 
+    if args.type == 'grid':
+        append_grid_experiment(args, experiments)
+
+    elif args.type == 'cdeepso':
+        append_cdeepso_experiment(args, experiments)
+
+    gridexec = Scheduler(task_filters, node_filters, args.output_folder, args.redo_tasks, args.confirmed, experiments, clusters)
     gridexec.start()
 
 
@@ -270,6 +311,7 @@ def do_draw_lines(argv):
                           args.ticks, args.ticks_format, args.legend_location,
                           args.verbose)
 
+
 def do_draw_lines_3d(argv):
     abort("Draw lines_3d is not implemented yet.")
 
@@ -326,10 +368,6 @@ def help_main_syntax():
     print(f"Syntax: patas [{','.join(BASIC_OPTIONS)}] ...")
 
 
-def help_explore_syntax():
-    print(f"Syntax: patas explore [{','.join(EXPLORE_OPTIONS)}] ...")
-
-
 def help_draw_syntax():
     print(f"Syntax: patas draw [{','.join(DRAW_OPTIONS)}] ...")
 
@@ -342,13 +380,6 @@ def main(*params):
 
     if len(args) == 0 or not args[0] in BASIC_OPTIONS:
         help_main_syntax()
-    
-    if args[0] == 'explore':
-
-        if len(args) == 1 or not args[1] in EXPLORE_OPTIONS:
-            help_explore_syntax()
-        
-        globals()['do_explore_' + args[1]](args[2:])
         
     elif args[0] == 'draw':
 

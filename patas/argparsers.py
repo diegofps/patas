@@ -1,18 +1,16 @@
 import argparse
-from argparse import ArgumentParser, Namespace
-from collections.abc import Sequence
-from typing import Any
+
 
 DEFAULT_PATAS_OUTPUT_DIR = './patasout'
 
 
-def parse_patas_explore_grid(argv):
+def parse_patas_explore(argv):
 
     # argparse for 'patas explore grid'
 
     parser = argparse.ArgumentParser(
-                        prog='patas explore grid',
-                        description='Execute a program permutating its input parameters.',
+                        prog='patas explore',
+                        description='Start a hyperparameter search.',
                         epilog="Check the README.md to learn more tips on how to use this feature: https://github.com/diegofps/patas/blob/main/README.md",
                         formatter_class=argparse.RawDescriptionHelpFormatter)
 
@@ -31,29 +29,6 @@ def parse_patas_explore_grid(argv):
                         dest='experiment',
                         help="path to an experiment file",
                         action='append')
-
-    parser.add_argument('--redo',
-                        dest='redo_tasks',
-                        help="forces patas to redo all tasks when an experiment is executed again",
-                        action='store_true')
-
-    parser.add_argument('--filter-tasks',
-                        type=str,
-                        default=[],
-                        nargs='*',
-                        metavar='A:B',
-                        dest='task_filters',
-                        help="restricts the tasks that will be executed [A:B, A:, :B, :]",
-                        action='append')
-
-    parser.add_argument('--filter-nodes',
-                        type=str,
-                        default=[],
-                        metavar='TAG',
-                        nargs='*',
-                        dest='node_filters',
-                        help="filter nodes that match these tags (AND)",
-                        action='store')
 
     parser.add_argument('--node',
                         type=str,
@@ -78,6 +53,36 @@ def parse_patas_explore_grid(argv):
 
     # Quick Experiment parameters
 
+    parser.add_argument('--type',
+                        default='grid',
+                        metavar='NAME',
+                        choices=('grid', 'cdeepso'),
+                        help='type of experiment to execute',
+                        action='store')
+
+    parser.add_argument('--redo',
+                        dest='redo_tasks',
+                        help="forces patas to redo all tasks when an experiment is executed again",
+                        action='store_true')
+
+    parser.add_argument('--filter-tasks',
+                        type=str,
+                        default=[],
+                        nargs='*',
+                        metavar='A:B',
+                        dest='task_filters',
+                        help="restricts the tasks that will be executed [A:B, A:, :B, :]",
+                        action='append')
+
+    parser.add_argument('--filter-nodes',
+                        type=str,
+                        default=[],
+                        metavar='TAG',
+                        nargs='*',
+                        dest='node_filters',
+                        help="filter nodes that match these tags (AND)",
+                        action='store')
+
     parser.add_argument('--name',
                         type=str,
                         default='grid',
@@ -92,7 +97,7 @@ def parse_patas_explore_grid(argv):
                         default=[],
                         metavar='VAL',
                         dest='var_list',
-                        help="defines an input variable that can assume a fixed number of values",
+                        help="defines an input variable that can assume a fixed number of values, used only in grid search",
                         action='append')
 
     parser.add_argument('--va',
@@ -101,7 +106,7 @@ def parse_patas_explore_grid(argv):
                         default=[],
                         metavar=('NAME', 'MIN', 'MAX', 'FACTOR'),
                         dest='var_arithmetic',
-                        help="defines an input variable that grows according to an arithmetic progression",
+                        help="defines an input variable that grows according to an arithmetic progression, used only in grid search",
                         action='append')
 
     parser.add_argument('--vg',
@@ -110,7 +115,7 @@ def parse_patas_explore_grid(argv):
                         default=[],
                         metavar=('NAME', 'MIN', 'MAX', 'FACTOR'),
                         dest='var_geometric',
-                        help="defines an input variable that grows according to a geometric progression",
+                        help="defines an input variable that grows according to a geometric progression, used only in grid search",
                         action='append')
 
     parser.add_argument('--repeat',
@@ -142,6 +147,13 @@ def parse_patas_explore_grid(argv):
                         dest='cmd',
                         help="command to be executed. Use {VAR_NAME} to replace its parameters with a named variable",
                         action='append')
+
+    parser.add_argument('--score-pattern',
+                        type=str,
+                        metavar='REGEX',
+                        dest='score_pattern',
+                        help="Pattern used to capture the fitness of the particle, used only with CDEEPSO search",
+                        action='store')
 
     return parser.parse_args(args=argv)
 
@@ -518,6 +530,7 @@ def parse_patas_draw_bars(argv):
                         action='store_true')
 
     return parser.parse_args(args=argv)
+
 
 def parse_patas_draw_lines(argv):
 

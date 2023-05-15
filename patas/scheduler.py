@@ -1,5 +1,5 @@
 from .utils import expand_path, error, warn, info, debug, critical, abort, readlines, clean_folder, estimate, human_time, quote, colors
-from .schemas import Experiment, Cluster, Node, format_as_dict
+from .schemas import GridExperimentSchema, ClusterSchema, NodeSchema, format_as_dict
 
 from multiprocessing import Process, Queue
 from subprocess import Popen, PIPE, STDOUT
@@ -426,7 +426,7 @@ class WorkerProcess:
         return task.success
 
 
-class GridExplorer():
+class Scheduler():
 
     def __init__(self, task_filters, node_filters, 
             output_dir, redo_tasks, confirmed,
@@ -460,7 +460,7 @@ class GridExplorer():
 
         print(colors.white("\n --- Experiments --- \n"))
 
-        experiment: Experiment = None
+        experiment: GridExperimentSchema = None
         total_combinations = 0
         total_tasks = 0
 
@@ -485,8 +485,8 @@ class GridExplorer():
 
         total_nodes = 0
         total_workers = 0
-        node:Node = None
-        cluster:Cluster = None
+        cluster:ClusterSchema = None
+        node:NodeSchema = None
 
         for cluster in clusters:
             total_nodes += len(cluster.nodes)
@@ -608,7 +608,7 @@ class GridExplorer():
 
         print("Creating tasks...")
 
-        e:Experiment = None
+        e:GridExperimentSchema = None
         combination_idd = -1
         experiment_idd = -1
         task_idd = -1
@@ -669,8 +669,8 @@ class GridExplorer():
 
         workers = []
 
-        cluster:Cluster = None
-        node:Node = None
+        cluster:ClusterSchema = None
+        node:NodeSchema = None
 
         for cluster in clusters:
             cluster_idd += 1

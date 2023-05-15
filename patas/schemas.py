@@ -31,7 +31,7 @@ class Schema:
             error(f"Missing required property in {self.__class__.__name__}: {name}")
 
 
-class Node(Schema):
+class NodeSchema(Schema):
 
     def __init__(self, data=None):
         
@@ -77,7 +77,7 @@ class Node(Schema):
         return self.hostname
 
 
-class Cluster(Schema):
+class ClusterSchema(Schema):
 
     def __init__(self, data=None):
         
@@ -92,12 +92,12 @@ class Cluster(Schema):
         self.load_property('name', data)
         self.load_property('nodes', data, mandatory=True)
         
-        self.nodes = [Node(x) for x in self.nodes]
+        self.nodes = [NodeSchema(x) for x in self.nodes]
 
         return self
 
 
-class ListVariable(Schema):
+class ListVariableSchema(Schema):
     
     def __init__(self, data=None):
 
@@ -117,7 +117,7 @@ class ListVariable(Schema):
         return self
 
 
-class ArithmeticVariable(Schema):
+class ArithmeticVariableSchema(Schema):
     
     def __init__(self, data=None):
 
@@ -147,7 +147,7 @@ class ArithmeticVariable(Schema):
         return self
 
 
-class GeometricVariable(Schema):
+class GeometricVariableSchema(Schema):
     
     def __init__(self, data=None):
 
@@ -182,28 +182,41 @@ class GeometricVariable(Schema):
         return self
 
 
-class Experiment(Schema):
+class BaseExperimentSchema(Schema):
 
     def __init__(self):
-
-        self.cmd = []
-        self.name = None
-        self.workdir = None
-        self.repeat = 1
+        
+        self.name      = None
+        self.workdir   = None
+        self.cmd       = []
         self.max_tries = 3
-        self.vars = []
-    
-    def init_from(self, data):
+        self.repeat    = 1
 
+    def init_from(self, data):
+        
         self.load_property('name', data)
         self.load_property('workdir', data)
-        self.load_property('repeat', data)
-        self.load_property('max_tries', data)
         self.load_property('cmd', data, mandatory=True)
+        self.load_property('max_tries', data)
+        self.load_property('repeat', data)
 
         if not isinstance(self.cmd, list):
             self.cmd = [self.cmd]
         
+        return self
+        
+
+class GridExperimentSchema(Schema):
+
+    def __init__(self):
+        
+        super().__init__()
+        self.vars = []
+    
+    def init_from(self, data):
+
+        super().init_from(data)
+
         if 'vars' in data:
             self.vars = []
 
@@ -211,13 +224,13 @@ class Experiment(Schema):
 
                 if 'type' in data2:
                     if data2['type'] == 'list':
-                        self.vars.append(ListVariable(data2))
+                        self.vars.append(ListVariableSchema(data2))
 
                     elif data2['type'] == 'arithmetic':
-                        self.vars.append(ArithmeticVariable(data2))
+                        self.vars.append(ArithmeticVariableSchema(data2))
 
                     elif data2['type'] == 'geometric':
-                        self.vars.append(GeometricVariable(data2))
+                        self.vars.append(GeometricVariableSchema(data2))
 
                     else:
                         error(f"Invalid property value in {self.__class__.__name__}: type={data2['type']}")
@@ -227,24 +240,38 @@ class Experiment(Schema):
         return self
 
 
+class CDEEPSOExperimentSchema(BaseExperimentSchema):
+
+    def __init__(self):
+        
+        super().__init__()
+        self.score = None
+    
+    def init_from(self, data):
+
+        super().init_from(data)
+        self.load_property('score', data, mandatory=True)
+        return self
+
+
 def load_cluster(filepath):
     with open(filepath, "r") as fin:
         data = yaml.load(fin, Loader=yaml.FullLoader)
-        return Cluster().init_from(data)
+        return ClusterSchema().init_from(data)
 
 
 def load_experiment(filepath):
     with open(filepath, "r") as fin:
         data = yaml.load(fin, Loader=yaml.FullLoader)
-        return Experiment().init_from(data)
+        return GridExperimentSchema().init_from(data)
 
 
-def save_cluster(filepath:str, data:Cluster):
+def save_cluster(filepath:str, data:ClusterSchema):
     with open(filepath, "w") as fout:
         yaml.dump(format_as_dict(data), fout, default_flow_style=False)
 
 
-def save_experiment(filepath:str, data:Cluster):
+def save_experiment(filepath:str, data:ClusterSchema):
     with open(filepath, "w") as fout:
         yaml.dump(format_as_dict(data), fout, default_flow_style=False)
 
