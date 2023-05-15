@@ -186,6 +186,7 @@ class BaseExperimentSchema(Schema):
 
     def __init__(self):
         
+        self.type      = 'base'
         self.name      = None
         self.workdir   = None
         self.cmd       = []
@@ -206,11 +207,12 @@ class BaseExperimentSchema(Schema):
         return self
         
 
-class GridExperimentSchema(Schema):
+class GridExperimentSchema(BaseExperimentSchema):
 
     def __init__(self):
         
         super().__init__()
+        self.type = 'grid'
         self.vars = []
     
     def init_from(self, data):
@@ -245,6 +247,7 @@ class CDEEPSOExperimentSchema(BaseExperimentSchema):
     def __init__(self):
         
         super().__init__()
+        self.type = 'cdeepso'
         self.score = None
     
     def init_from(self, data):

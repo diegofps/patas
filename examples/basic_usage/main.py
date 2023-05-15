@@ -21,9 +21,9 @@ activation_params = {
 
 # The closer to 1, the more representative the data
 preprocessing_params = {
-    "fast": 0.79,
-    "medium": 0.87,
-    "intense": 0.94
+    "fast":    0.87,
+    "medium":  0.93,
+    "intense": 0.98
 }
 
 act = activation_params[activation_function]

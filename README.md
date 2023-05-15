@@ -27,10 +27,10 @@ cd examples/basic_usage
 Assuming we want to vary the number of hidden neurons from `1` to `51` with steps of `2` and the activation function in `['relu' 'leaky_relu' 'sigmoid' 'tanh']`, we can generate all combinationsand parallelize the script above using `patas explore grid`. This will also collect its entire stdout and save them in the folder `patasout/grid`. Each combination will be executed `10` times, as we want to measure the average accuracies later.
 
 ```shell
-patas explore grid \
-    --cmd './main.py {neurons} {activation}' \
+patas explore --type grid \
+    --cmd './main.py {neurons} {activation} {preprocessing}' \
     --va neurons 1 51 2 \
-    --vl preprocessing fast medium intensive \
+    --vl preprocessing fast medium intense \
     --vl activation relu leaky_relu sigmoid tanh \
     --node localhost \
     --repeat 10
