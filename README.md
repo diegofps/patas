@@ -8,7 +8,7 @@ pip install patas
 
 # Basic usage 🐣
 
-Considering the use case that we need to find the optimal configuration for a neural network. In this case we are interested in variating the number of hidden neurons and the activation function in the hidden layer. We want to execute our prgoram multiple times, combining the values of these two parameters, and collect metrics of interest, like train and test accuracies. We then want to analyse this output and select the best configuration. The following subsections will describe how to achieve this.
+Considering the use case that we need to find the optimal configuration for a neural network. In this case we are interested in variating the number of hidden neurons, the activation function, and the complexity of preprocessing we do. We want to execute our prgoram multiple times, combining the values of these two parameters, and collect metrics of interest, like train and test accuracies. We then want to analyse this output and select the best configuration. The following subsections will describe how to achieve this.
 
 ## The program
 
@@ -30,11 +30,19 @@ Assuming we want to vary the number of hidden neurons from `1` to `51` with step
 patas explore grid \
     --cmd './main.py {neurons} {activation}' \
     --va neurons 1 51 2 \
+    --vl preprocessing fast medium intensive \
     --vl activation relu leaky_relu sigmoid tanh \
+    --node localhost \
     --repeat 10
 ```
 
-The parameter `--cmd` define the command that must be executed. If we define more than one `--cmd` they will all be executed, one after the other. The parameter `--vl` defines a variable of type list, it receives the variable name and the list of values it can receive. Next, the parameter `--repeat` defines the number of times the program will be called using a given variable combination. In this example, the parameter neurons define `26` values and the paramter activation define `4` values. This will generate `104 combinations`. Considering the repeat parameter has the value `10`, the program will be excuted `1040` times. That is, patas will have `1040 tasks` to do. You can define as many variable as you want, but the more you have the longer it will take to execute, growing exponentially.
+Here is a short description of the parameters above:
+
+`--cmd` - defines the command that must be executed. If we define more than one `--cmd` they will all be executed, one after the other. 
+`--va` - defines a variable of type arithmetic, it receives the variable name, an initial value, a maximum value and a step value. It will generate a list similar to the Python's method `range`. 
+`--vl` - defines a variable of type list, it receives the variable name and the list of values it can receive. 
+`--node` - defines a node to execute the program. This may be any machine accessible via SSH that won't ask for a password. This command accepts an optional argument to indicate the number of workers in the machine. If non is provided, it will default to the number of cores in the machine. You may want to check the program `ssh-copy-id` to learn how to install a public key on a remote machine and log in without a password. 
+`--repeat` defines the number of times the program will be called using a given variable combination. In this example, the parameter neurons define `25` values, parameter preprocessing defines `3` values and the paramter activation define `4` values. This will generate `300 combinations`. Considering the repeat parameter has the value `10`, the program will be excuted `3000` timesm. That is, we asked patas to do `3000 tasks`. You can define as many variables as you want, but the more you have the longer it will take to execute.
 
 ## patas parse
 
@@ -43,8 +51,11 @@ When the experiment is done executing, we can parse its outputs and collect the 
 ```shell
 patas parse \
     -e 'patasout/grid/' \
-    -p train_acc  'Train accuracy:     (@float@)' \
-    -p test_acc   'Test accuracy:      (@float@)'
+    -p train_time  'Time to train \(ms\): (@float@)' \
+    -p test_time   'Time to test \(ms\):  (@float@)' \
+    -p train_acc   'Train accuracy:     (@float@)' \
+    -p test_acc    'Test accuracy:      (@float@)' \
+    -p loss        'Final Loss:         (@float@)'
 ```
 
 The parameter `-e` define the experiment folder, containing the prgoram outputs and a few extra info. The parameter `-p` define a pattern patas is going to look for. It receives a name and a regular expression string. The output file will be saved in `patasout/grid/grid.csv`. This contains a table with the input variables, collected results, and extra variables associated to the experiment. 
@@ -60,10 +71,10 @@ patas query 'select * from grid limit 2' -m
 The parameter `-m` asks patas to print the output in markdown format.
 The output for the command above should have a similar structure to the content bellow. The values may vary as the script is non-determininstic.
 
-| in_activation | in_neurons | out_train_acc | out_test_acc | break_id | task_id | repeat_id | combination_id | experiment_id | experiment_name | duration | started_at                 | ended_at                   | tries | max_tries | cluster_id | cluster_name | node_id | node_name | worker_id | output_dir                                                       | work_dir                                       |
-| ------------- | ---------- | ------------- | ------------ | -------- | ------- | --------- | -------------- | ------------- | --------------- | -------- | -------------------------- | -------------------------- | ----- | --------- | ---------- | ------------ | ------- | --------- | --------- | ---------------------------------------------------------------- | ---------------------------------------------- |
-| leaky_relu    | 25.0       | 0.499         | 0.475        | 0        | 386.0   | 6.0       | 38.0           | 0             | grid            | 0.055867 | 2023-05-11 14:33:23.000000 | 2023-05-11 14:33:23.000000 | 1     | 3.0       | 0          | cluster      | 0       | localhost | 13.0      | /home/ubuntu/Sources/patas/examples/basic_usage/patasout/grid/386 | /home/ubuntu/Sources/patas/examples/basic_usage |
-| sigmoid       | 27.0       | 0.855         | 0.825        | 0        | 652.0   | 2.0       | 65.0           | 0             | grid            | 0.056768 | 2023-05-11 14:33:23.000000 | 2023-05-11 14:33:23.000000 | 1     | 3.0       | 0          | cluster      | 0       | localhost | 26.0      | /home/ubuntu/Sources/patas/examples/basic_usage/patasout/grid/652 | /home/ubuntu/Sources/patas/examples/basic_usage |
+| in_activation | in_neurons | in_preprocessing | out_train_time | out_test_time | out_train_acc | out_test_acc | out_loss | break_id | task_id | repeat_id | combination_id | experiment_id | experiment_name | duration | started_at                 | ended_at                   | tries | max_tries | cluster_id | cluster_name | node_id | node_name | worker_id | output_dir                                                        | work_dir                                       |
+| ------------- | ---------- | ---------------- | -------------- | ------------- | ------------- | ------------ | -------- | -------- | ------- | --------- | -------------- | ------------- | --------------- | -------- | -------------------------- | -------------------------- | ----- | --------- | ---------- | ------------ | ------- | --------- | --------- | ----------------------------------------------------------------- | ---------------------------------------------- |
+| relu          | 33.0       | medium           | 183.473        | 12.389        | 0.554         | 0.547        | 0.434    | 0        | 1160.0  | 0.0       | 116.0          | 0             | grid            | 0.051055 | 2023-05-15 12:10:05.000000 | 2023-05-15 12:10:05.000000 | 1     | 3.0       | 0          | cluster      | 0       | node0     | 19.0      | /home/diego/Sources/patas/examples/basic_usage/patasout/grid/1160 | /home/diego/Sources/patas/examples/basic_usage |
+| leaky_relu    | 27.0       | fast             | 163.021        | 10.333        | 0.462         | 0.432        | 0.355    | 0        | 386.0   | 6.0       | 38.0           | 0             | grid            | 0.055031 | 2023-05-15 12:10:06.000000 | 2023-05-15 12:10:06.000000 | 1     | 3.0       | 0          | cluster      | 0       | node0     | 8.0       | /home/diego/Sources/patas/examples/basic_usage/patasout/grid/386  | /home/diego/Sources/patas/examples/basic_usage |
 
 We must remember that for every combination, patas will execute the program `--repeat` times, passing the same input parameters and collecting multiple output variables. This is useful when the algorithm we are evaluating is non-deterministic and we wish to collect reliable metrics, like our script. To aggregate these values we can calculate the average value using the `AVG` function with the `GROUP BY` statement.
 

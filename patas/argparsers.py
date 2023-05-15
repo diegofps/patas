@@ -37,11 +37,6 @@ def parse_patas_explore_grid(argv):
                         help="forces patas to redo all tasks when an experiment is executed again",
                         action='store_true')
 
-    parser.add_argument('--recreate',
-                        dest='recreate',
-                        help="recreate the entire output folder if it contains a different experiment configuration",
-                        action='store_true')
-
     parser.add_argument('--filter-tasks',
                         type=str,
                         default=[],

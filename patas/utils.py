@@ -326,34 +326,34 @@ def human_time(seconds):
     v = seconds
 
     if v < 60:
-        return f"{v} seconds"
+        return f"{v:.2f} seconds"
     v /= 60
 
     if v < 60:
-        return f"{v} minutes"
+        return f"{v:.2f} minutes"
     v /= 60
 
     if v < 24:
-        return f"{v} hours"
+        return f"{v:.2f} hours"
     v /= 24
 
     if v < 7:
-        return f"{v} days"
+        return f"{v:.2f} days"
     v /= 7
 
     if v < 52:
-        return f"{v} weeks ~ {v / 4.0} months"
+        return f"{v:.2f} weeks ~ {v/4.0:.2f} months"
     v /= 52
 
     if v < 100:
-        return f"{v} years"
+        return f"{v:.2f} years"
     v /= 100
 
     if v < 10:
-        return f"{v} centuries"
+        return f"{v:.2f} centuries"
     v /= 10
 
-    return f"{v} milleniums"
+    return f"{v:.2f} milleniums"
 
 
 def estimate(tasks, workers, seconds):

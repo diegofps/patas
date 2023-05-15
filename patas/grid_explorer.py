@@ -2,7 +2,7 @@ from .utils import expand_path, error, warn, info, debug, critical, abort, readl
 from .schemas import Experiment, Cluster, Node, format_as_dict
 
 from multiprocessing import Process, Queue
-from subprocess import Popen, PIPE
+from subprocess import Popen, PIPE, STDOUT
 from datetime import datetime
 
 import hashlib
@@ -124,18 +124,16 @@ class BashExecutor:
         if type(cmds) is not list:
             cmds = [cmds]
 
-        cmds = [x + b' 2>&1 ' for x in cmds]
-
         p1 = b" ; ".join(initrc)
         p3 = b" ; ".join(cmds)
 
         cmd_str = b" %s ; %s " % (p1, p3)
         cmd_str = "bash -c " + quote(cmd_str.decode('utf-8'))
         
-        ps = Popen(shlex.split(cmd_str), stdout=PIPE)
+        ps = Popen(shlex.split(cmd_str), stdout=PIPE, stderr=STDOUT)
 
         status = ps.wait()
-        stdout = ps.stdout
+        stdout = ps.stdout.read()
 
         return (status == 0), stdout, status
 
@@ -288,7 +286,7 @@ class SSHExecutor:
                 status = lines[output_end].strip().split()[0].decode("utf-8") if output_end < len(lines) else "255"
                 break
 
-        return (status == "0"), lines[output_start:output_end], status
+        return (status == "0"), b'\n'.join(lines[output_start:output_end]), status
 
 
 class WorkerProcess:
@@ -358,7 +356,9 @@ class WorkerProcess:
             env_variables["PATAS_VAR_" + k] = str(v)
 
         initrc = [b"export %s=\"%s\"" % (a.encode(), b.encode()) for a, b in env_variables.items()]
-        initrc.insert(0, b"cd \"%s\"" % task.work_dir.encode())
+
+        if task.work_dir:
+            initrc.insert(0, b"cd \"%s\"" % task.work_dir.encode())
 
         # Prepare the command line we will execute
 
@@ -370,6 +370,7 @@ class WorkerProcess:
         task.success, task.output, task.status = executor.execute(initrc, cmdline)
         task.ended_at = datetime.now()
         task.duration = (task.ended_at - task.started_at).total_seconds()
+        # print((task.success, task.output, task.status))
 
         # Create the task folder and clean any old .done file
 
@@ -407,7 +408,7 @@ class WorkerProcess:
 
         filepath = os.path.join(task.output_dir, "stdout")
         with open(filepath, "wb") as fout:
-            fout.writelines(task.output)
+            fout.write(task.output)
 
         # Create .done file if the task succeded
 
@@ -419,8 +420,7 @@ class WorkerProcess:
 
         else:
             warn("--- TASK %d FAILED WITH EXIT CODE %s ---" % (task.task_idd, task.status))
-            for line in task.output:
-                os.write(sys.stdout.fileno(), line)
+            os.write(sys.stdout.fileno(), task.output)
             warn("--- END OF FAILED OUTPUT ---")
 
         return task.success
@@ -429,16 +429,15 @@ class WorkerProcess:
 class GridExplorer():
 
     def __init__(self, task_filters, node_filters, 
-            output_dir, redo_tasks, recreate, confirmed,
+            output_dir, redo_tasks, confirmed,
             experiments, clusters):
 
-        self.output_folder = expand_path  (output_dir)
+        self.output_folder = expand_path(output_dir)
         self.task_filters  = task_filters
         self.node_filters  = node_filters
         self.experiments   = experiments
         self.redo_tasks    = redo_tasks
         self.confirmed     = confirmed
-        self.recreate      = recreate
         self.clusters      = clusters
 
         self.workers:list[WorkerProcess] = None
@@ -450,7 +449,6 @@ class GridExplorer():
         os.makedirs(self.output_folder, exist_ok=True)
 
         self._show_summary(self.experiments, self.clusters, self.confirmed)
-        self._write_signature()
         self.tasks   = self._create_tasks(self.experiments, self.output_folder, self.redo_tasks, self.task_filters)
         self.workers = self._create_workers(self.clusters, self.node_filters)
         self._exec()
@@ -463,19 +461,21 @@ class GridExplorer():
         print(colors.white("\n --- Experiments --- \n"))
 
         experiment: Experiment = None
+        total_combinations = 0
         total_tasks = 0
 
         for experiment in experiments:
             variables = experiment.vars
-            current = 1
+            combinations = 1
 
             for var in variables:
-                current *= len(var.values)
+                combinations *= len(var.values)
             
-            current *= experiment.repeat
-            total_tasks += current
+            tasks = combinations * experiment.repeat
+            total_tasks += tasks
+            total_combinations += combinations
 
-            print(f"'{experiment.name}' has {len(variables)} variable(s) and produces {current} task(s):")
+            print(f"'{experiment.name}' has {len(variables)} variable(s), {combinations} combination(s), and {tasks} task(s):")
             for var in variables:
                 print(f"    {var.name} = {str(var.values)}, len = {len(var.values)}")
         
@@ -504,14 +504,14 @@ class GridExplorer():
         print(f"Task filters:  {self.task_filters}")
         print(f"Node filters:  {self.node_filters}")
         print(f"Output folder: {self.output_folder}")
-        print(f"Recreate:      {self.recreate}")
 
         print()
 
-        print(f"Total number of clusters: {len(clusters)}")
-        print(f"Total number of nodes:    {total_nodes}")
-        print(f"Total number of workers:  {total_workers}")
-        print(f"Total number of tasks:    {total_tasks}")
+        print(f"Number of clusters:     {len(clusters)}")
+        print(f"Number of nodes:        {total_nodes}")
+        print(f"Number of workers:      {total_workers}")
+        print(f"Number of combinations: {total_combinations}")
+        print(f"Number of tasks:        {total_tasks}")
 
         print()
 
@@ -522,6 +522,11 @@ class GridExplorer():
         print(f"    One day:    { estimate(total_tasks, total_workers, 60*60*24) }")
 
         print()
+
+        # Create and check signature
+
+        info, info_filepath, signature = self._create_signature()
+        recreate = self._check_signature(signature, info_filepath)
 
         # Confirm
 
@@ -537,8 +542,15 @@ class GridExplorer():
                         print('Invalid option')
             except KeyboardInterrupt:
                 sys.exit(0)
+        
+        if recreate:
+            warn("Recreating output folder...")
+            clean_folder(self.output_folder)
 
-    def _write_signature(self):
+        # Write signature file 
+        self._write_info(info, info_filepath)
+
+    def _create_signature(self):
 
         # Calculate the signature for the received configuration
 
@@ -552,11 +564,10 @@ class GridExplorer():
 
         info = {
             "output_folder": self.output_folder,
-            "task_filters": self.task_filters,
+            "task_filters": [{"from":a, "to":b} for a,b in self.task_filters],
             "node_filters": self.node_filters,
             "experiments": format_as_dict(self.experiments),
             "redo_tasks": self.redo_tasks,
-            "recreate": self.recreate,
             "clusters": format_as_dict(self.clusters),
             "signature": signature
         }
@@ -565,20 +576,27 @@ class GridExplorer():
 
         info_filepath = os.path.join(self.output_folder, "info.yml")
 
+        return info, info_filepath, signature
+
+    def _check_signature(self, signature, info_filepath):
+
+        # Load previous signature, if it exists
+
         try:
             with open(info_filepath, "r") as fin:
                 other = yaml.load(fin, Loader=yaml.FullLoader)
         except:
             other = None
 
-        # If the previous file was loaded and it has a signature, compare it to the current signature
+        # Warn about a different experiment presence if the signatures don't match
 
         if other and "signature" in other and other["signature"] != signature:
-            if self.recreate:
-                print("Recreating output folder...")
-                clean_folder(self.output_folder)
-            else:
-                abort("The output folder contains a different output configuration. Provide an empty folder or add the parameter --recreate to overwrite this one")
+            warn("The output folder contains a different output configuration. If you continue, all experiments will be recreated and all tasks restarted.")
+            return True
+
+        return False
+
+    def _write_info(self, info, info_filepath):
 
         # Write the new signature file
             

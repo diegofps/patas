@@ -35,7 +35,13 @@ def create_experiments(args):
         experiment.workdir = args.workdir
     else:
         from os import environ
-        experiment.workdir = environ['PWD']
+        pwd = environ.get('PWD', None)
+        home = environ.get('HOME', None)
+
+        if home and pwd.startswith(home):
+            experiment.workdir = '$HOME' + pwd[len(home):]
+        else:
+            experiment.workdir = pwd
     
     if args.cmd:
         experiment.cmd = args.cmd
@@ -202,7 +208,7 @@ def do_explore_grid(argv):
     clusters     = create_clusters(args)
     task_filters = create_task_filters(args)
     node_filters = create_node_filters(args)
-    gridexec     = GridExplorer(task_filters, node_filters, args.output_folder, args.redo_tasks, args.recreate, args.confirmed, experiments, clusters)
+    gridexec     = GridExplorer(task_filters, node_filters, args.output_folder, args.redo_tasks, args.confirmed, experiments, clusters)
 
     gridexec.start()
 

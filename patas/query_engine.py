@@ -19,14 +19,16 @@ class QueryEngine:
                     self.tables.append(f'"{table_filepath}"')
 
     def query(self, query, pretty_print):
-        
 
+        if not self.tables:
+            abort('No experiment table found. Did you parse any of them?')
+        
         tables = " ".join(self.tables)
 
         if pretty_print:
-            cmd = f"csvsql -d ',' --query {quote_single(query)} {tables} 2> /dev/null | csvlook --no-inference" 
+            cmd = f"csvsql --no-inference -d ',' --query {quote_single(query)} {tables} 2> /dev/null | csvlook --no-inference" 
         else:
-            cmd = f"csvsql -d ',' --query {quote_single(query)} {tables} 2> /dev/null"
+            cmd = f"csvsql --no-inference -d ',' --query {quote_single(query)} {tables} 2> /dev/null"
         
         status, _ = run(cmd)
 

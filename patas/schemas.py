@@ -123,6 +123,7 @@ class ArithmeticVariable(Schema):
 
         self.type = 'arithmetic'
         self.name = None
+        self.values = []
         self.step = 1
         self.min  = 0
         self.max  = 10
@@ -134,11 +135,7 @@ class ArithmeticVariable(Schema):
     
     def update(self):
         from numpy import arange
-        self._values = arange(self.min, self.max, self.step)
-    
-    @property
-    def values(self):
-        return self._values
+        self.values = arange(self.min, self.max, self.step).tolist()
     
     def init_from(self, data):
 
@@ -156,6 +153,7 @@ class GeometricVariable(Schema):
 
         self.type = 'geometric'
         self.name = None
+        self.values = []
         self.factor = 2
         self.min = 1
         self.max = 17
@@ -167,16 +165,12 @@ class GeometricVariable(Schema):
     
     def update(self):
         
-        self._values = list()
+        self.values = list()
         current = self.first
         
         while current < self.last:
-            self._values.append(current)
+            self.values.append(current)
             current = current * self.factor
-    
-    @property
-    def values(self):
-        return self._values
     
     def init_from(self, data):
 
