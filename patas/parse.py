@@ -78,8 +78,9 @@ class TaskParser:
         
         if verbose:
             for var_name in ["break_id", "task_id", "repeat_id", "combination_id", "experiment_id", "experiment_name", 
-                            "duration", "started_at", "ended_at", "tries", "max_tries", 
-                            "cluster_id", "cluster_name", "node_id", "node_name", "worker_id", "output_dir", "work_dir"]:
+                            "tries", "max_tries", "duration", "started_at", "ended_at", 
+                            "cluster_name", "node_name", "cluster_in_lab", "node_in_lab", "node_in_cluster",
+                            "worker_in_lab", "worker_in_cluster", "worker_in_node", "output_dir", "work_dir"]:
 
                 self._add_column(var_name)
 
@@ -100,7 +101,7 @@ class TaskParser:
         # Filepaths for each task files
 
         info_filepath   = os.path.join(task_folderpath, "info.yml")
-        output_filepath = os.path.join(task_folderpath, "stdout")
+        output_filepath = os.path.join(task_folderpath, "success.stdout")
         done_filepath   = os.path.join(task_folderpath, ".success")
 
         # We clean the output row, as we will populate it with the data from the task
@@ -108,10 +109,11 @@ class TaskParser:
         for i in range(len(self.row_values)):
             self.row_values[i] = None
 
-        # If the done file does not exist, it means the task wasnot completed, this is likely a user mistake
+        # If the done file does not exist, it means the task was not completed, this is likely a user mistake
 
         if not os.path.exists(done_filepath):
             warn("Task not completed:", task_folderpath)
+            return
         
         # Load the task info
 
@@ -136,19 +138,29 @@ class TaskParser:
             self.row_values[self.header_map["combination_id"  ]] = data["combination_id"  ]
             self.row_values[self.header_map["experiment_id"   ]] = data["experiment_id"   ]
             self.row_values[self.header_map["experiment_name" ]] = data["experiment_name" ]
-            self.row_values[self.header_map["duration"        ]] = data["duration"        ]
-            self.row_values[self.header_map["started_at"      ]] = data["started_at"      ]
-            self.row_values[self.header_map["ended_at"        ]] = data["ended_at"        ]
-            self.row_values[self.header_map["tries"           ]] = data["tries"           ]
             self.row_values[self.header_map["max_tries"       ]] = data["max_tries"       ]
             self.row_values[self.header_map["output_dir"      ]] = data["output_dir"      ]
             self.row_values[self.header_map["work_dir"        ]] = data["work_dir"        ]
+            
+            if data['tries']:
 
-            self.row_values[self.header_map["cluster_id"  ]] = data["env_variables"]["PATAS_CLUSTER_ID"  ]
-            self.row_values[self.header_map["cluster_name"]] = data["env_variables"]["PATAS_CLUSTER_NAME"]
-            self.row_values[self.header_map["node_id"     ]] = data["env_variables"]["PATAS_NODE_ID"     ]
-            self.row_values[self.header_map["node_name"   ]] = data["env_variables"]["PATAS_NODE_NAME"   ]
-            self.row_values[self.header_map["worker_id"   ]] = data["env_variables"]["PATAS_WORKER_ID"   ]
+                attempt = data['tries'][-1]
+
+                self.row_values[self.header_map["tries"]] = len(data["tries"])
+
+                self.row_values[self.header_map["duration"  ]] = attempt["duration"  ]
+                self.row_values[self.header_map["started_at"]] = attempt["started_at"]
+                self.row_values[self.header_map["ended_at"  ]] = attempt["ended_at"  ]
+
+                self.row_values[self.header_map["cluster_name"     ]] = attempt["env_variables"]["PATAS_CLUSTER_NAME"     ]
+                self.row_values[self.header_map["node_name"        ]] = attempt["env_variables"]["PATAS_NODE_NAME"        ]
+                self.row_values[self.header_map["cluster_in_lab"   ]] = attempt["env_variables"]["PATAS_CLUSTER_IN_LAB"   ]
+                self.row_values[self.header_map["node_in_lab"      ]] = attempt["env_variables"]["PATAS_NODE_IN_LAB"      ]
+                self.row_values[self.header_map["node_in_cluster"  ]] = attempt["env_variables"]["PATAS_NODE_IN_CLUSTER"  ]
+                self.row_values[self.header_map["worker_in_lab"    ]] = attempt["env_variables"]["PATAS_WORKER_IN_LAB"    ]
+                self.row_values[self.header_map["worker_in_cluster"]] = attempt["env_variables"]["PATAS_WORKER_IN_CLUSTER"]
+                self.row_values[self.header_map["worker_in_node"   ]] = attempt["env_variables"]["PATAS_WORKER_IN_NODE"   ]
+
 
         # Parse the patterns and write to output
 

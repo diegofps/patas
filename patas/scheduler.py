@@ -315,12 +315,10 @@ class WorkerProcess:
 
         # Execute this task
 
-        # sys.stdout.write(f"{self.worker_idd_in_world} is starting cmd {cmdline}\n")
         started_at = datetime.now()
         task.success, stdout, status = executor.execute(initrc, cmdline)
         ended_at = datetime.now()
         duration = (ended_at - started_at).total_seconds()
-        # sys.stdout.write(f"{self.worker_idd_in_world} ended command\n")
 
         # Add result to the task results
 
@@ -484,10 +482,10 @@ class Scheduler():
                         "PATAS_CLUSTER_NAME": cluster.name,
                         "PATAS_NODE_NAME":    node.name,
 
-                        "PATAS_CLUSTER_IN_LAB":  str(cluster_idd),
-                        "PATAS_NODE_IN_LAB":     str(node_idd_in_lab),
+                        "PATAS_CLUSTER_IN_LAB":    str(cluster_idd),
+                        "PATAS_NODE_IN_LAB":       str(node_idd_in_lab),
                         "PATAS_NODE_IN_CLUSTER":   str(node_idd_in_cluster),
-                        "PATAS_WORKER_IN_LAB":   str(worker_idd_in_lab),
+                        "PATAS_WORKER_IN_LAB":     str(worker_idd_in_lab),
                         "PATAS_WORKER_IN_CLUSTER": str(worker_idd_in_cluster),
                         "PATAS_WORKER_IN_NODE":    str(worker_idd_in_node),
                     }
@@ -557,11 +555,11 @@ class Scheduler():
                     l5 = str(len(self.filtered))
 
                     d  = colors.gray  ("|%s|" % str(datetime.now()))
-                    l1 = colors.white ('TODO:'     + " " * (chars_todo - len(l1)) + l1 + " |")
-                    l2 = colors.green ('DOING:'    + " " * (chars_work - len(l2)) + l2 + " |")
-                    l3 = colors.blue  ('DONE:'     + " " * (chars_todo - len(l3)) + l3 + " |")
-                    l4 = colors.red   ('GIVEN_UP:' + " " * (chars_todo - len(l4)) + l4 + " |")
-                    l5 = colors.purple('FILTERED:' + " " * (chars_todo - len(l5)) + l5 + " |")
+                    l1 = colors.white ('|TODO:'     + " " * (chars_todo - len(l1)) + l1 + "|")
+                    l2 = colors.green ('|DOING:'    + " " * (chars_work - len(l2)) + l2 + "|")
+                    l3 = colors.blue  ('|DONE:'     + " " * (chars_todo - len(l3)) + l3 + "|")
+                    l4 = colors.red   ('|GIVEN_UP:' + " " * (chars_todo - len(l4)) + l4 + "|")
+                    l5 = colors.purple('|FILTERED:' + " " * (chars_todo - len(l5)) + l5 + "|")
 
                     print(f"{d} {l1} {l2} {l3} {l4} {l5}")
 
