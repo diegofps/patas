@@ -1,17 +1,14 @@
-from .utils import expand_path, error, warn, info, debug, critical, abort, readlines, clean_folder, estimate, human_time, quote, colors
-from .schemas import GridExperimentSchema, ClusterSchema, NodeSchema, format_as_dict
+from .utils import expand_path, error, warn, info, debug, critical, abort, readlines, estimate, human_time, quote, colors
+from .schemas import ClusterSchema, NodeSchema, Task
 
 from multiprocessing import Process, Queue
 from subprocess import Popen, PIPE, STDOUT
 from datetime import datetime
 
-import hashlib
-import base64
 import select
 import shlex
 import copy
 import time
-import yaml
 import pty
 import sys
 import os
@@ -28,24 +25,6 @@ ECHO_SSH_ON  = build_echo_cmd(KEY_SSH_ON)
 ECHO_SSH_OFF = build_echo_cmd(KEY_SSH_OFF)
 ECHO_CMD_ON  = build_echo_cmd(KEY_CMD_ON)
 ECHO_CMD_OFF = b" echo -en \"\n $? %s\"" % KEY_CMD_OFF.replace(b"-", b"-\b-")
-
-
-def combine_variables(variables, combination={}):
-
-    if len(variables) == len(combination):
-        yield copy.copy(combination)
-    
-    else:
-        var = variables[len(combination)]
-        name = var.name
-        
-        for value in var.values:
-            combination[name] = value
-            
-            for tmp in combine_variables(variables, combination):
-                yield tmp
-            
-        del combination[name]
 
 
 class WorkerMessage(dict):
@@ -68,44 +47,11 @@ class WorkerMessage(dict):
         self[key] = value
 
 
-class Task:
-
-    def __init__(self, 
-            experiment_name, task_output_dir, work_dir, experiment_idd, combination_idd, 
-            repeat_idd, task_idd, combination, cmdlines, max_tries):
-
-        self.experiment_name = experiment_name
-        self.combination_idd = combination_idd
-        self.experiment_idd  = experiment_idd
-        self.output_dir      = task_output_dir
-        self.combination     = combination
-        self.repeat_idd      = repeat_idd
-        self.max_tries       = max_tries
-        self.work_dir        = work_dir
-        self.task_idd        = task_idd
-        self.commands        = cmdlines
-        self.assigned_to     = None
-        self.started_at      = None
-        self.ended_at        = None
-        self.duration        = None
-        self.success         = None
-        self.output          = None
-        self.status          = None
-        self.tries           = 0
-    
-    
-    def __repr__(self):
-
-        combination = ";".join(f"{k}={v}" for k, v in self.combination.items())
-        return f"{self.experiment_idd} {self.combination_idd} {self.repeat_idd} {self.task_idd} {combination} {self.commands}"
-
-
 class ExecutorBuilder:
 
     def __init__(self, executor_type, node):
         self.executor_type = executor_type
         self.node = node
-
 
     def __call__(self):
         return self.executor_type(self.node)
@@ -118,7 +64,6 @@ class BashExecutor:
         self.is_alive = True
         self.node = node
     
-
     def execute(self, initrc, cmds):
 
         if type(cmds) is not list:
@@ -153,7 +98,6 @@ class SSHExecutor:
 
         self._connect()
     
-
     def _build_connnection_string(self, node):
 
         tokens = [b' ssh']
@@ -177,7 +121,6 @@ class SSHExecutor:
         
         return b"".join(tokens)
 
-
     def _start_bash(self):
 
         debug("Starting bash")
@@ -189,7 +132,6 @@ class SSHExecutor:
                 stdout=self.slave,
                 stderr=self.slave,
                 universal_newlines=True)
-
 
     def _connect(self):
 
@@ -235,7 +177,6 @@ class SSHExecutor:
             warn("Sleeping before next try...")
             time.sleep(1)
             conn_try += 1
-
 
     def execute(self, initrc, cmds):
 
@@ -299,13 +240,11 @@ class WorkerProcess:
         self.process = None
         self.queue = None
 
-
     def start(self, queue_master):
 
         self.queue = Queue()
         self.process = Process(target=self.run, args=(self.queue, queue_master))
         self.process.start()
-
 
     def run(self, queue_in, queue_master):
 
@@ -342,20 +281,19 @@ class WorkerProcess:
         except KeyboardInterrupt:
             pass
 
-
     def execute(self, msg_in, executor):
 
         task:Task = msg_in.task
 
         # Prepare the initrc
 
-        env_variables = copy.copy(self.env_variables)
-        env_variables["PATAS_WORK_DIR"] = task.work_dir
+        task.env_variables = copy.copy(self.env_variables)
+        task.env_variables["PATAS_WORK_DIR"] = task.work_dir
 
         for k,v in task.combination.items():
-            env_variables["PATAS_VAR_" + k] = str(v)
+            task.env_variables["PATAS_VAR_" + k] = str(v)
 
-        initrc = [b"export %s=\"%s\"" % (a.encode(), b.encode()) for a, b in env_variables.items()]
+        initrc = [b"export %s=\"%s\"" % (a.encode(), b.encode()) for a, b in task.env_variables.items()]
 
         if task.work_dir:
             initrc.insert(0, b"cd \"%s\"" % task.work_dir.encode())
@@ -370,148 +308,74 @@ class WorkerProcess:
         task.success, task.output, task.status = executor.execute(initrc, cmdline)
         task.ended_at = datetime.now()
         task.duration = (task.ended_at - task.started_at).total_seconds()
-        # print((task.success, task.output, task.status))
 
-        # Create the task folder and clean any old .done file
-
-        done_filepath = os.path.join(task.output_dir, ".done")
-        os.makedirs(task.output_dir, exist_ok=True)
-        if os.path.exists(done_filepath):
-            os.remove(done_filepath)
-
-        # Dump task info
-        
-        info = {
-            "task_id": task.task_idd,
-            "repeat_id": task.repeat_idd,
-            "experiment_id": task.experiment_idd,
-            "experiment_name": task.experiment_name,
-            "combination_id": task.combination_idd,
-            "combination": task.combination,
-            "started_at": task.started_at,
-            "ended_at": task.ended_at,
-            "duration": task.duration,
-            "env_variables": env_variables,
-            "max_tries": task.max_tries,
-            "tries": task.tries + 1,
-            "output_dir": task.output_dir,
-            "work_dir": task.work_dir,
-            "commands": task.commands,
-            "assigned_to": task.assigned_to,
-        }
-
-        filepath = os.path.join(task.output_dir, "info.yml")
-        with open(filepath, "w") as fout:
-            yaml.dump(info, fout, default_flow_style=False)
-        
-        # Dump task output
-
-        filepath = os.path.join(task.output_dir, "stdout")
-        with open(filepath, "wb") as fout:
-            fout.write(task.output)
-
-        # Create .done file if the task succeded
-
-        if task.success:
-            with open(done_filepath, 'a'):
-                os.utime(done_filepath, None)
-
-        # Write output to stdout if the task failed
-
-        else:
-            warn("--- TASK %d FAILED WITH EXIT CODE %s ---" % (task.task_idd, task.status))
-            os.write(sys.stdout.fileno(), task.output)
-            warn("--- END OF FAILED OUTPUT ---")
+        # Return True if the task succeeded
 
         return task.success
 
 
 class Scheduler():
 
-    def __init__(self, task_filters, node_filters, 
-            output_dir, redo_tasks, confirmed,
-            experiments, clusters):
+    def __init__(self, node_filters, output_dir, redo_tasks, confirmed, experiments, clusters):
 
         self.output_folder = expand_path(output_dir)
-        self.task_filters  = task_filters
         self.node_filters  = node_filters
         self.experiments   = experiments
         self.redo_tasks    = redo_tasks
         self.confirmed     = confirmed
         self.clusters      = clusters
+        self.todo          = []
 
         self.workers:list[WorkerProcess] = None
-        self.tasks  :list[Task         ] = None
-
 
     def start(self):
 
         os.makedirs(self.output_folder, exist_ok=True)
 
-        self._show_summary(self.experiments, self.clusters, self.confirmed)
-        self.tasks   = self._create_tasks(self.experiments, self.output_folder, self.redo_tasks, self.task_filters)
+        self.show_summary(self.experiments, self.clusters, self.confirmed)
         self.workers = self._create_workers(self.clusters, self.node_filters)
         self._exec()
 
+    def push_task(self, task):
+        self.todo.append(task)
 
-    def _show_summary(self, experiments, clusters, confirmed):
+    def show_summary(self, experiments, clusters, confirmed):
 
         # Display experiments
 
         print(colors.white("\n --- Experiments --- \n"))
 
-        experiment: GridExperimentSchema = None
-        total_combinations = 0
         total_tasks = 0
-
         for experiment in experiments:
-            variables = experiment.vars
-            combinations = 1
-
-            for var in variables:
-                combinations *= len(var.values)
-            
-            tasks = combinations * experiment.repeat
-            total_tasks += tasks
-            total_combinations += combinations
-
-            print(f"'{experiment.name}' has {len(variables)} variable(s), {combinations} combination(s), and {tasks} task(s):")
-            for var in variables:
-                print(f"    {var.name} = {str(var.values)}, len = {len(var.values)}")
+            experiment.show_summary()
+            total_tasks += experiment.number_of_tasks()
         
         # Display clusters
 
         print(colors.white("\n --- Clusters --- \n"))
 
-        total_nodes = 0
+        total_nodes   = 0
         total_workers = 0
-        cluster:ClusterSchema = None
-        node:NodeSchema = None
-
         for cluster in clusters:
-            total_nodes += len(cluster.nodes)
-            print(f"'{cluster.name}' has {len(cluster.nodes)} node(s):")
-
-            for node in cluster.nodes:
-                total_workers += node.workers
-                print(f"    '{node.name}' has {node.workers} worker(s)")
-        
+            cluster.show_summary()
+            total_nodes   += cluster.number_of_nodes()
+            total_workers += cluster.number_of_workers()
+            
         # Display total numbers and estimations
 
         print(colors.white("\n --- Overview --- \n"))
 
         print(f"Redo:          {self.redo_tasks}")
-        print(f"Task filters:  {self.task_filters}")
         print(f"Node filters:  {self.node_filters}")
         print(f"Output folder: {self.output_folder}")
 
         print()
 
-        print(f"Number of clusters:     {len(clusters)}")
-        print(f"Number of nodes:        {total_nodes}")
-        print(f"Number of workers:      {total_workers}")
-        print(f"Number of combinations: {total_combinations}")
-        print(f"Number of tasks:        {total_tasks}")
+        print(f"Number of experiments: {len(experiments)}")
+        print(f"Number of clusters:    {len(clusters)}")
+        print(f"Number of nodes:       {total_nodes}")
+        print(f"Number of workers:     {total_workers}")
+        print(f"Number of tasks:       {total_tasks}")
 
         print()
 
@@ -523,10 +387,13 @@ class Scheduler():
 
         print()
 
-        # Create and check signature
+        # Check experiment signatures
 
-        info, info_filepath, signature = self._create_signature()
-        recreate = self._check_signature(signature, info_filepath)
+        issues = [x for x in experiments if x.check_signature(self.output_folder)]
+
+        if issues:
+            names = ', '.join([x.name for x in issues])
+            warn(f"The following experiments have changed their configuration, proceeding will restart all their tasks: {names}")
 
         # Confirm
 
@@ -543,121 +410,17 @@ class Scheduler():
             except KeyboardInterrupt:
                 sys.exit(0)
         
-        if recreate:
-            warn("Recreating output folder...")
-            clean_folder(self.output_folder)
+        # Clean diverging experiments
 
-        # Write signature file 
-        self._write_info(info, info_filepath)
+        if issues:
+            warn("Cleaning diverging experiments...")
+            for experiment in issues:
+                experiment.clean_output(self.output_folder)
 
-    def _create_signature(self):
+        # Write signature files
 
-        # Calculate the signature for the received configuration
-
-        key = hashlib.md5()
-
-        key.update(str(format_as_dict(self.experiments)).encode())
-
-        signature = base64.b64encode(key.digest()).decode("utf-8")
-
-        # Data to be saved into the signature file
-
-        info = {
-            "output_folder": self.output_folder,
-            "task_filters": [{"from":a, "to":b} for a,b in self.task_filters],
-            "node_filters": self.node_filters,
-            "experiments": format_as_dict(self.experiments),
-            "redo_tasks": self.redo_tasks,
-            "clusters": format_as_dict(self.clusters),
-            "signature": signature
-        }
-
-        # Load the previous signature file, if it exists
-
-        info_filepath = os.path.join(self.output_folder, "info.yml")
-
-        return info, info_filepath, signature
-
-    def _check_signature(self, signature, info_filepath):
-
-        # Load previous signature, if it exists
-
-        try:
-            with open(info_filepath, "r") as fin:
-                other = yaml.load(fin, Loader=yaml.FullLoader)
-        except:
-            other = None
-
-        # Warn about a different experiment presence if the signatures don't match
-
-        if other and "signature" in other and other["signature"] != signature:
-            warn("The output folder contains a different output configuration. If you continue, all experiments will be recreated and all tasks restarted.")
-            return True
-
-        return False
-
-    def _write_info(self, info, info_filepath):
-
-        # Write the new signature file
-            
-        with open(info_filepath, "w") as fout:
-            yaml.dump(info, fout, default_flow_style=False)
-
-
-    def _create_tasks(self, experiments, output_folder, redo_tasks, task_filters):
-
-        print("Creating tasks...")
-
-        e:GridExperimentSchema = None
-        combination_idd = -1
-        experiment_idd = -1
-        task_idd = -1
-        tasks = []
-
-        for e in experiments:
-
-            experiment_idd += 1
-
-            experiment_filepath = os.path.join(output_folder, e.name)
-            info_filepath = os.path.join(experiment_filepath, "info.yml")
-            os.makedirs(experiment_filepath, exist_ok=True)
-
-            info = {
-                "experiment_name": e.name,
-                "workdir": e.workdir,
-                "commands": e.cmd,
-                "repeat": e.repeat,
-                "max_tries": e.max_tries,
-                "variables": {v.name:v.values for v in e.vars}
-            }
-
-            with open(info_filepath, "w") as fout:
-                yaml.dump(info, fout, default_flow_style=False)
-
-            for combination in combine_variables(e.vars):
-                combination_idd += 1
-
-                for repeat_idd in range(e.repeat):
-                    task_idd += 1
-
-                    if task_filters and not any(a <= task_idd < b for a, b in task_filters):
-                        continue
-
-                    task_output_folder = os.path.join(experiment_filepath, str(task_idd))
-
-                    if not redo_tasks and os.path.exists(os.path.join(task_output_folder, ".done")):
-                        continue
-
-                    cmds = [x.format(**combination) for x in e.cmd]
-
-                    task = Task(e.name, task_output_folder, e.workdir, experiment_idd, combination_idd, repeat_idd, task_idd, combination, cmds, e.max_tries)
-                    tasks.append(task)
-
-        if not tasks:
-            abort("No tasks to do.")
-        
-        return tasks
-
+        for experiment in experiments:
+            experiment.write_signature(self.output_folder)
 
     def _create_workers(self, clusters, node_filters):
 
@@ -706,12 +469,11 @@ class Scheduler():
         
         return workers
 
-
     def _exec(self):
 
         self.queue    = Queue()
 
-        self.todo     = copy.copy(self.tasks)
+        self.todo     = []
         self.doing    = []
         self.done     = []
         self.given_up = []
@@ -719,18 +481,23 @@ class Scheduler():
         self.idle     = []
         self.ended    = []
 
-        len_todo      = len(str(len(self.todo)))
-        len_workers   = len(str(len(self.workers)))
+        chars_todo    = 10
+        chars_work    = 10
         
         # Start workers
 
         print()
-        info("Starting %d worker(s)" % len(self.workers))
+        info(f"Starting {len(self.workers)} worker(s)")
 
         for worker in self.workers:
             worker.start(self.queue)
         
         info("Worker(s) started")
+
+        # Start experiments
+
+        for experiment in self.experiments:
+            experiment.on_start(self)
 
         # Main loop
 
@@ -751,18 +518,18 @@ class Scheduler():
                 l4 = str(len(self.given_up))
 
                 d  = colors.gray("|%s|" % str(datetime.now()))
-                l1 = colors.white(" " * (len_todo    - len(l1)) + l1 + " |")
-                l2 = colors.white(" " * (len_workers - len(l2)) + l2 + " |")
-                l3 = colors.green(" " * (len_todo    - len(l3)) + l3 + " |")
-                l4 = colors.red  (" " * (len_todo    - len(l4)) + l4 + " |")
+                l1 = colors.white(" " * (chars_todo - len(l1)) + l1 + " |")
+                l2 = colors.white(" " * (chars_work - len(l2)) + l2 + " |")
+                l3 = colors.green(" " * (chars_todo - len(l3)) + l3 + " |")
+                l4 = colors.red  (" " * (chars_todo - len(l4)) + l4 + " |")
 
                 print(f"{d} {l1} {l2} {l3} {l4}")
 
                 if msg_in.action == "ready":
-                    self._ready(msg_in)
+                    self._on_worker_is_ready(msg_in)
                 
                 elif msg_in.action == "finished":
-                    self._finished(msg_in)
+                    self._on_task_finished(msg_in)
                 
                 else:
                     warn("Unknown action:", msg_in.action)
@@ -777,6 +544,11 @@ class Scheduler():
         main_loop_ended_at = datetime.now()
         main_loop_duration = (main_loop_ended_at - main_loop_started_at).total_seconds()
         
+        # Send on_finish to all experiments
+
+        for experiment in self.experiments:
+            experiment.on_finish()
+
         # Terminate workers
 
         terminate_loop_started_at = datetime.now()
@@ -806,8 +578,8 @@ class Scheduler():
                     l1 = str(len(self.ended))
                     l2 = str(len(self.workers))
 
-                    l1 = " " * (len_workers - len(l1)) + l1
-                    l2 = " " * (len_workers - len(l2)) + l2
+                    l1 = " " * (chars_work - len(l1)) + l1
+                    l2 = " " * (chars_work - len(l2)) + l2
 
                     print("%s %sEnded %s / %s%s" % (d, colors.WHITE, l1, l2, colors.RESET))
                 
@@ -828,15 +600,17 @@ class Scheduler():
         # Display execution summary
 
         print(colors.white("\n --- Execution Summary --- \n"))
-        print(f"    Time to execute tasks: {human_time(main_loop_duration)}")
-        print(f"    Time to terminate workers: {human_time(terminate_loop_duration)}")
-        print(f"    Tasks requested: {len(self.tasks)}")
+
+        print(f"    Time to execute experiments: {human_time(main_loop_duration)}")
+        print(f"    Time to terminate workers:   {human_time(terminate_loop_duration)}")
+        print(f"    Tasks requested: {len(self.done) + len(self.given_up)}")
         print(f"    Tasks completed: {len(self.done)}")
-        print(f"    Tasks given up: {len(self.given_up)}")
+        print(f"    Tasks given up:  {len(self.given_up)}")
         print()
 
-    def _ready(self, msg_in):
+    def _on_worker_is_ready(self, msg_in):
 
+        # If there is a task to be done, send it back to the worker
         if self.todo:
             msg_out = WorkerMessage("execute")
             msg_out.task = self.todo.pop()
@@ -845,41 +619,61 @@ class Scheduler():
             self.doing.append(msg_out.task)
             self.workers[msg_in.source].queue.put(msg_out)
         
+        # Otherwise, move the worker to the like of idle workers
+
         else:
             self.idle.append(msg_in.source)
 
+    def _on_task_finished(self, msg_in):
 
-    def _finished(self, msg_in):
+        # Find the position of the task we just received in the message
 
         for i, x in enumerate(self.doing):
             if x.assigned_to == msg_in.source:
                 break
-        
-        if i == len(self.doing):
+        else:
             warn("Received finished msg but the task was not found inside the doing list")
             return
         
+        # Retrieve the task and experiment objects
+
         task:Task = self.doing[i]
-        del self.doing[i]
         task.tries += 1
+        experiment = self.experiments[task.experiment_idd]
+        del self.doing[i]
+
+        # Print stdout if the task has failed
+
+        if not task.success:
+            warn("--- TASK %d FAILED WITH EXIT CODE %s ---" % (task.task_idd, task.status))
+            os.write(sys.stdout.fileno(), task.output)
+            warn("--- END OF FAILED OUTPUT ---")
+
+        # If the task finished successfully, notify its experiment and move it to done
 
         if msg_in.success:
             self.done.append(task)
-            return
+            experiment.on_task_completed(self, task)
 
-        if task.tries >= task.max_tries:
+        # If max_tries has been reached, notify the experiment and move it to given_up
+
+        elif task.tries >= task.max_tries:
             critical(f"Giving up on task {task.task_idd}, max_tries reached.")
             self.given_up.append(task)
-            return
+            experiment.on_task_completed(self, task)
         
-        if not self.idle:
+        # If a worker is available, ask it to execute the task again
+
+        elif self.idle:
+            target = self.idle.pop()
+
+            msg_out = WorkerMessage("execute")
+            msg_out.task = task
+            msg_out.task.assigned_to = target
+
+            self.workers[target].queue.put(msg_out)
+
+        # Otherwise, move the task back to todo, we will schedule it again in the future
+
+        else:
             self.todo.append(task)
-            return
-
-        target = self.idle.pop()
-
-        msg_out = WorkerMessage("execute")
-        msg_out.task = task
-        msg_out.task.assigned_to = target
-
-        self.workers[target].queue.put(msg_out)

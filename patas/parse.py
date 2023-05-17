@@ -101,7 +101,7 @@ class TaskParser:
 
         info_filepath   = os.path.join(task_folderpath, "info.yml")
         output_filepath = os.path.join(task_folderpath, "stdout")
-        done_filepath   = os.path.join(task_folderpath, ".done")
+        done_filepath   = os.path.join(task_folderpath, ".success")
 
         # We clean the output row, as we will populate it with the data from the task
 

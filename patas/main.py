@@ -5,6 +5,7 @@ try:
 except:
     from patas import consts as c
 
+from collections import defaultdict
 from patas.utils import error, node_cpu_count, abort, warn
 from patas import argparsers
 from patas import schemas
@@ -189,28 +190,36 @@ def create_clusters(args):
 
 def create_task_filters(args):
 
-    task_filters = []
+    task_filters = defaultdict(list)
 
     for filters in args.task_filters:
-        for task in filters:
+        for slice in filters:
             try:
 
-                cells = task.split(':')
+                cells = slice.split(':')
 
-                if len(cells) == 2:
+                if len(cells) == 3:
+                    xp =     cells[0]  if cells[0] else args.type
+                    i1 = int(cells[1]) if cells[1] else 0
+                    i2 = int(cells[2]) if cells[2] else float('inf')
+                
+                elif len(cells) == 2:
+                    xp = args.type
                     i1 = int(cells[0]) if cells[0] else 0
                     i2 = int(cells[1]) if cells[1] else float('inf')
-                    task_filters.append((i1, i2))
 
                 elif len(cells) == 1:
+                    xp = args.type
                     i1 = int(cells[0]) if cells[0] else 0
-                    task_filters.append((i1, i1+1))
+                    i2 = i1+1
 
                 else:
-                    error(f'Invalid attribute for --task-filter: {task}')
+                    error(f'Invalid attribute for --task-filter: {slice}')
+                
+                task_filters[xp].append((i1, i2))
 
             except ValueError:
-                error(f'Invalid attribute for --task-filter: {task}')
+                error(f'Invalid attribute for --task-filter: {slice}')
 
     return task_filters
 
@@ -250,7 +259,14 @@ def do_explore(argv):
     elif args.type == 'cdeepso':
         append_cdeepso_experiment(args, experiments)
 
-    gridexec = Scheduler(task_filters, node_filters, args.output_folder, args.redo_tasks, args.confirmed, experiments, clusters)
+    for x in experiments:
+        x.task_filters = task_filters.pop(x.name, [])
+    
+    if task_filters:
+        names = ', '.join([x for x in task_filters])
+        warn(f"task-filters for the following experiments were not used: {names}")
+
+    gridexec = Scheduler(node_filters, args.output_folder, args.redo_tasks, args.confirmed, experiments, clusters)
     gridexec.start()
 
 
