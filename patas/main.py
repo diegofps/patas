@@ -271,7 +271,7 @@ def do_explore(argv):
         names = ', '.join([x for x in task_filters])
         warn(f"Ignoring task-filters for the following experiments: {names}")
 
-    scheduler = Scheduler(node_filters, args.output_folder, args.redo_tasks, args.confirmed, experiments, clusters)
+    scheduler = Scheduler(node_filters, args.output_folder, args.redo_tasks, args.confirmed, experiments, clusters, args.quiet)
     scheduler.start()
 
 

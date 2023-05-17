@@ -43,6 +43,11 @@ def parse_patas_explore(argv):
                         help="skip confirmation before starting the tasks",
                         action='store_true')
 
+    parser.add_argument('-q',
+                        dest='quiet',
+                        help="only display critical events",
+                        action='store_true')
+
     parser.add_argument('-o',
                         type=str,
                         default=DEFAULT_PATAS_OUTPUT_DIR,

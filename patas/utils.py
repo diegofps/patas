@@ -392,3 +392,16 @@ def node_cpu_count(user, hostname, port, default):
     except ValueError:
         return default
                 
+def confirm():
+
+    try:
+        while True:
+            option = input('Do you want to continue? [Y/n] ').strip()
+            if option in ['Y', 'y', '']:
+                break
+            elif option in ['N', 'n']:
+                sys.exit(0)
+            else:
+                print('Invalid option')
+    except KeyboardInterrupt:
+        sys.exit(0)

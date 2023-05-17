@@ -1,4 +1,4 @@
-from .utils import expand_path, error, warn, info, debug, critical, abort, readlines, estimate, human_time, quote, colors
+from .utils import expand_path, error, warn, info, debug, critical, abort, readlines, estimate, human_time, quote, colors, confirm
 from .schemas import ClusterSchema, NodeSchema, Task
 
 from multiprocessing import Process, Queue
@@ -332,7 +332,7 @@ class WorkerProcess:
 
 class Scheduler():
 
-    def __init__(self, node_filters, output_dir, redo_tasks, confirmed, experiments, clusters):
+    def __init__(self, node_filters, output_dir, redo_tasks, confirmed, experiments, clusters, quiet):
 
         self.output_folder = expand_path(output_dir)
         self.node_filters  = node_filters
@@ -340,6 +340,7 @@ class Scheduler():
         self.redo_tasks    = redo_tasks
         self.confirmed     = confirmed
         self.clusters      = clusters
+        self.quiet         = quiet
         self.todo          = []
 
         self.workers:list[WorkerProcess] = None
@@ -414,17 +415,7 @@ class Scheduler():
         # Confirm
 
         if not confirmed:
-            try:
-                while True:
-                    option = input('Do you want to continue? [Y/n] ').strip()
-                    if option in ['Y', 'y', '']:
-                        break
-                    elif option in ['N', 'n']:
-                        sys.exit(0)
-                    else:
-                        print('Invalid option')
-            except KeyboardInterrupt:
-                sys.exit(0)
+            confirm()
         
         # Clean diverging experiments
 
@@ -483,14 +474,14 @@ class Scheduler():
 
                     env_variables = {
                         "PATAS_CLUSTER_NAME": cluster.name,
-                        "PATAS_NODE_NAME": node.name,
+                        "PATAS_NODE_NAME":    node.name,
 
-                        "PATAS_CLUSTER_IN_WORLD": str(cluster_idd),
-                        "PATAS_NODE_IN_WORLD": str(node_idd_in_world),
-                        "PATAS_NODE_IN_CLUSTER": str(node_idd_in_cluster),
-                        "PATAS_WORKER_IN_WORLD": str(worker_idd_in_world),
+                        "PATAS_CLUSTER_IN_WORLD":  str(cluster_idd),
+                        "PATAS_NODE_IN_WORLD":     str(node_idd_in_world),
+                        "PATAS_NODE_IN_CLUSTER":   str(node_idd_in_cluster),
+                        "PATAS_WORKER_IN_WORLD":   str(worker_idd_in_world),
                         "PATAS_WORKER_IN_CLUSTER": str(worker_idd_in_cluster),
-                        "PATAS_WORKER_IN_NODE": str(worker_idd_in_node),
+                        "PATAS_WORKER_IN_NODE":    str(worker_idd_in_node),
                     }
 
                     worker = WorkerProcess(worker_idd_in_world, worker_idd_in_cluster, worker_idd_in_node, builder, env_variables)
@@ -544,18 +535,19 @@ class Scheduler():
 
                 msg_in = self.queue.get()
 
-                l1 = str(len(self.todo    ))
-                l2 = str(len(self.doing   ))
-                l3 = str(len(self.done    ))
-                l4 = str(len(self.given_up))
+                if not self.quiet:
+                    l1 = str(len(self.todo    ))
+                    l2 = str(len(self.doing   ))
+                    l3 = str(len(self.done    ))
+                    l4 = str(len(self.given_up))
 
-                d  = colors.gray("|%s|" % str(datetime.now()))
-                l1 = colors.white(" " * (chars_todo - len(l1)) + l1 + " |")
-                l2 = colors.white(" " * (chars_work - len(l2)) + l2 + " |")
-                l3 = colors.green(" " * (chars_todo - len(l3)) + l3 + " |")
-                l4 = colors.red  (" " * (chars_todo - len(l4)) + l4 + " |")
+                    d  = colors.gray("|%s|" % str(datetime.now()))
+                    l1 = colors.white(" " * (chars_todo - len(l1)) + l1 + " |")
+                    l2 = colors.white(" " * (chars_work - len(l2)) + l2 + " |")
+                    l3 = colors.green(" " * (chars_todo - len(l3)) + l3 + " |")
+                    l4 = colors.red  (" " * (chars_todo - len(l4)) + l4 + " |")
 
-                print(f"{d} {l1} {l2} {l3} {l4}")
+                    print(f"{d} {l1} {l2} {l3} {l4}")
 
                 if msg_in.action == "ready":
                     self._on_worker_is_ready(msg_in)
@@ -605,12 +597,13 @@ class Scheduler():
 
                     self.ended.append(msg.source)
 
-                    d = colors.gray("|%s|" % str(datetime.now()))
+                    # d = colors.gray("|%s|" % str(datetime.now()))
 
-                    l1 = str(len(self.ended))
-                    l2 = str(len(self.workers))
+                    # l1 = str(len(self.ended))
+                    # l2 = str(len(self.workers))
 
-                    print("%s %sEnded %s / %s%s" % (d, colors.WHITE, l1, l2, colors.RESET))
+                    # if not self.quiet:
+                    #     print("%s %sEnded %s / %s%s" % (d, colors.WHITE, l1, l2, colors.RESET))
                 
                 else:
                     #debug("Ignoring action %s from %s, execution is ending" % (msg.source, msg.action))
@@ -637,6 +630,12 @@ class Scheduler():
         print(f"    Tasks given up:  {len(self.given_up)}")
         print()
 
+        # if self.given_up:
+        #     print("Gave up on:", [t.task_idd for t in self.given_up])
+        
+        # if self.done:
+        #     print("Done:", [t.task_idd for t in self.done])
+
     def _on_worker_is_ready(self, msg_in):
 
         # If there is a task to be done, send it back to the worker
@@ -647,11 +646,17 @@ class Scheduler():
 
             self.doing.append(msg_out.task)
             self.workers[msg_in.source].queue.put(msg_out)
+
+            if not self.quiet:
+                print(f"Sending task {msg_out.task.task_idd} to worker {msg_in.source}")
         
         # Otherwise, move the worker to the like of idle workers
 
         else:
             self.idle.append(msg_in.source)
+
+            if not self.quiet:
+                print(f"Moving worker {msg_in.source} to idle")
 
     def _on_task_finished(self, msg_in):
 
@@ -661,7 +666,7 @@ class Scheduler():
             if x.assigned_to == msg_in.source:
                 break
         else:
-            warn("Received finished event for a task that was not found inside the doing list")
+            critical(f"Received finished event for task {msg_in.task.task_idd}, which was not found inside the doing list")
             return
         
         # Retrieve the task we sent the worker
@@ -675,7 +680,7 @@ class Scheduler():
         # Check if they are the same, otherwise something weird is happening
 
         if not task.task_idd == task_sent.task_idd:
-            warn("Received finished event for a task that was not the task we found in the doing list")
+            critical("Received finished event for a task that was not the task we found in the doing list")
             return
     
         # This is a valid task, proceed
@@ -688,7 +693,7 @@ class Scheduler():
 
         if not task.success and task.attempts:
             result = task.attempts[-1]
-            warn("--- TASK %d FAILED WITH EXIT CODE %s ---" % (task.task_idd, result['status']))
+            warn(f"--- TASK {task.task_idd} FAILED WITH EXIT CODE {result['status']} {task.tries}/{task.max_tries} ---")
             os.write(sys.stdout.fileno(), result['stdout'])
             warn("--- END OF FAILED OUTPUT ---")
 
@@ -698,25 +703,36 @@ class Scheduler():
             self.done.append(task)
             experiment.on_task_completed(self, task)
 
+            if not self.quiet:
+                print(f"Moving task {task.task_idd} to done")
+
         # If max_tries has been reached, notify the experiment and move it to given_up
 
         elif task.tries >= task.max_tries:
-            critical(f"Giving up on task {task.task_idd}, max_tries reached.")
             self.given_up.append(task)
             experiment.on_task_completed(self, task)
+            critical(f"Giving up on task {task.task_idd}, max_tries reached.")
         
         # If a worker is available, ask it to execute the task again
 
         elif self.idle:
-            target = self.idle.pop()
+            worker_idd = self.idle.pop()
+
+            task.assigned_to = worker_idd
+            self.doing.append(task)
 
             msg_out = WorkerMessage("execute")
             msg_out.task = task
-            msg_out.task.assigned_to = target
 
-            self.workers[target].queue.put(msg_out)
+            self.workers[worker_idd].queue.put(msg_out)
+
+            if not self.quiet:
+                print(f"Reassigning task {task.task_idd} to new worker {worker_idd} after fail")
 
         # Otherwise, move the task back to todo, we will schedule it again in the future
 
         else:
             self.todo.append(task)
+
+            if not self.quiet:
+                print(f"No worker available to retry task {task.task_idd}, moving it back to todo")

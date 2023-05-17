@@ -331,9 +331,12 @@ class GridExperimentSchema(BaseExperimentSchema):
         tasks = combinations * self.repeat
         filters = len(self.task_filters)
 
+        attrs = ['experiment_idd', 'redo_tasks', 'workdir', 'task_filters', 'cmd', 'max_tries', 'repeat']
+
         lines = [f"'{self.name}' has {len(self.vars)} variable(s), {combinations} combination(s), {tasks} task(s), and {filters} task-filter(s):"] + \
-                [f"    {v.name} = {str(v.values)}, len = {len(v.values)}" for v in self.vars] + \
-                [f"    task-filters = {self.task_filters}"]
+                [f"  {name}: {getattr(self, name)}" for name in attrs] + \
+                ['  Variables:'] + \
+                [f"    {v.name} = {str(v.values)}, len = {len(v.values)}" for v in self.vars]
         
         data = ' ' * indent + ('\n' + ' ' * indent).join(lines)
         print(data)
