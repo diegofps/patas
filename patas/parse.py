@@ -142,24 +142,24 @@ class TaskParser:
             self.row_values[self.header_map["output_dir"      ]] = data["output_dir"      ]
             self.row_values[self.header_map["work_dir"        ]] = data["work_dir"        ]
             
-            if data['tries']:
+            if data['results']:
 
-                attempt = data['tries'][-1]
+                result = data['results'][-1]
 
-                self.row_values[self.header_map["tries"]] = len(data["tries"])
+                self.row_values[self.header_map["tries"]] = len(data["results"])
 
-                self.row_values[self.header_map["duration"  ]] = attempt["duration"  ]
-                self.row_values[self.header_map["started_at"]] = attempt["started_at"]
-                self.row_values[self.header_map["ended_at"  ]] = attempt["ended_at"  ]
+                self.row_values[self.header_map["duration"  ]] = result["duration"  ]
+                self.row_values[self.header_map["started_at"]] = result["started_at"]
+                self.row_values[self.header_map["ended_at"  ]] = result["ended_at"  ]
 
-                self.row_values[self.header_map["cluster_name"     ]] = attempt["env_variables"]["PATAS_CLUSTER_NAME"     ]
-                self.row_values[self.header_map["node_name"        ]] = attempt["env_variables"]["PATAS_NODE_NAME"        ]
-                self.row_values[self.header_map["cluster_in_lab"   ]] = attempt["env_variables"]["PATAS_CLUSTER_IN_LAB"   ]
-                self.row_values[self.header_map["node_in_lab"      ]] = attempt["env_variables"]["PATAS_NODE_IN_LAB"      ]
-                self.row_values[self.header_map["node_in_cluster"  ]] = attempt["env_variables"]["PATAS_NODE_IN_CLUSTER"  ]
-                self.row_values[self.header_map["worker_in_lab"    ]] = attempt["env_variables"]["PATAS_WORKER_IN_LAB"    ]
-                self.row_values[self.header_map["worker_in_cluster"]] = attempt["env_variables"]["PATAS_WORKER_IN_CLUSTER"]
-                self.row_values[self.header_map["worker_in_node"   ]] = attempt["env_variables"]["PATAS_WORKER_IN_NODE"   ]
+                self.row_values[self.header_map["cluster_name"     ]] = result["env_variables"]["PATAS_CLUSTER_NAME"     ]
+                self.row_values[self.header_map["node_name"        ]] = result["env_variables"]["PATAS_NODE_NAME"        ]
+                self.row_values[self.header_map["cluster_in_lab"   ]] = result["env_variables"]["PATAS_CLUSTER_IN_LAB"   ]
+                self.row_values[self.header_map["node_in_lab"      ]] = result["env_variables"]["PATAS_NODE_IN_LAB"      ]
+                self.row_values[self.header_map["node_in_cluster"  ]] = result["env_variables"]["PATAS_NODE_IN_CLUSTER"  ]
+                self.row_values[self.header_map["worker_in_lab"    ]] = result["env_variables"]["PATAS_WORKER_IN_LAB"    ]
+                self.row_values[self.header_map["worker_in_cluster"]] = result["env_variables"]["PATAS_WORKER_IN_CLUSTER"]
+                self.row_values[self.header_map["worker_in_node"   ]] = result["env_variables"]["PATAS_WORKER_IN_NODE"   ]
 
 
         # Parse the patterns and write to output

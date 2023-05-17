@@ -24,7 +24,7 @@ cd examples/basic_usage
 
 ## patas explore
 
-Assuming we want to vary the number of hidden neurons from `1` to `51` with steps of `2` and the activation function in `['relu' 'leaky_relu' 'sigmoid' 'tanh']`, we can generate all combinationsand parallelize the script above using `patas explore grid`. This will also collect its entire stdout and save them in the folder `patasout/grid`. Each combination will be executed `10` times, as we want to measure the average accuracies later.
+Assuming we want to vary the number of hidden neurons from `1` to `51` with steps of `2` and the activation function in `['relu' 'leaky_relu' 'sigmoid' 'tanh']`, we can generate all combinationsand parallelize the script above using `patas explore grid`. This will also collect its entire stdout and save them in the folder `pataslab/grid`. Each combination will be executed `10` times, as we want to measure the average accuracies later.
 
 ```shell
 patas explore --type grid \
@@ -58,7 +58,7 @@ patas parse \
     -p loss        'Final Loss:         (@float@)'
 ```
 
-The parameter `-e` define the experiment folder, containing the prgoram outputs and a few extra info. The parameter `-p` define a pattern patas is going to look for. It receives a name and a regular expression string. The output file will be saved in `patasout/grid/grid.csv`. This contains a table with the input variables, collected results, and extra variables associated to the experiment. 
+The parameter `-e` define the experiment folder, containing the prgoram outputs and a few extra info. The parameter `-p` define a pattern patas is going to look for. It receives a name and a regular expression string. The output file will be saved in `pataslab/grid/grid.csv`. This contains a table with the input variables, collected results, and extra variables associated to the experiment. 
 
 ## patas query
 
@@ -73,8 +73,8 @@ The output for the command above should have a similar structure to the content 
 
 | in_activation | in_neurons | in_preprocessing | out_train_time | out_test_time | out_train_acc | out_test_acc | out_loss | break_id | task_id | repeat_id | combination_id | experiment_id | experiment_name | tries | max_tries | duration | started_at                 | ended_at                   | cluster_name | node_name | cluster_in_lab | node_in_lab | node_in_cluster | worker_in_lab | worker_in_cluster | worker_in_node | output_dir                                                        | work_dir                                 |
 | ------------- | ---------- | ---------------- | -------------- | ------------- | ------------- | ------------ | -------- | -------- | ------- | --------- | -------------- | ------------- | --------------- | ----- | --------- | -------- | -------------------------- | -------------------------- | ------------ | --------- | -------------- | ----------- | --------------- | ------------- | ----------------- | -------------- | ----------------------------------------------------------------- | ---------------------------------------- |
-| relu          | 33         | medium           | 173.008        | 5.351         | 0.457         | 0.453        | 0.382    | 0        | 1160    | 0         | 116            | 0             | grid            | 1     | 3         | 0.224716 | 2023-05-17 17:51:33.978750 | 2023-05-17 17:51:34.203466 | cluster      | node0     | 0              | 0           | 0               | 50            | 50                | 50             | /home/diego/Sources/patas/examples/basic_usage/pataslab/grid/1160 | $HOME/Sources/patas/examples/basic_usage |
-| leaky_relu    | 27         | fast             | 160.231        | 12.759        | 0.316         | 0.297        | 0.503    | 0        | 386     | 6         | 38             | 0             | grid            | 1     | 3         | 0.237198 | 2023-05-17 17:51:36.900759 | 2023-05-17 17:51:37.137957 | cluster      | node0     | 0              | 0           | 0               | 56            | 56                | 56             | /home/diego/Sources/patas/examples/basic_usage/pataslab/grid/386  | $HOME/Sources/patas/examples/basic_usage |
+| relu          | 33         | medium           | 175.812        | 4.880         | 0.423         | 0.411        | 0.338    | 0        | 1160    | 0         | 116            | 0             | grid            | 1     | 3         | 0.224591 | 2023-05-17 19:14:55.472312 | 2023-05-17 19:14:55.696903 | cluster      | node0     | 0              | 0           | 0               | 14            | 14                | 14             | /home/diego/Sources/patas/examples/basic_usage/pataslab/grid/1160 | $HOME/Sources/patas/examples/basic_usage |
+| leaky_relu    | 27         | fast             | 190.677        | 6.904         | 0.286         | 0.270        | 0.288    | 0        | 386     | 6         | 38             | 0             | grid            | 1     | 3         | 0.225969 | 2023-05-17 19:14:58.327345 | 2023-05-17 19:14:58.553314 | cluster      | node0     | 0              | 0           | 0               | 47            | 47                | 47             | /home/diego/Sources/patas/examples/basic_usage/pataslab/grid/386  | $HOME/Sources/patas/examples/basic_usage |
 
 We must remember that for every combination, patas will execute the program `--repeat` times, passing the same input parameters and collecting multiple output variables. This is useful when the algorithm we are evaluating is non-deterministic and we wish to collect reliable metrics, like our script. To aggregate these values we can calculate the average value using the `AVG` function with the `GROUP BY` statement.
 
@@ -118,7 +118,7 @@ Patas will also help you quickly create basic graphics based on the data in the 
 
 ```shell
 patas draw heatmap \
-    --input patasout/grid/grid.csv \
+    --input pataslab/grid/grid.csv \
     --x-column in_neurons \
     --y-column in_activation \
     --z-column out_test_acc \
@@ -129,7 +129,7 @@ patas draw heatmap \
 
 ```shell
 patas draw heatmap \
-    --input 'patasout/grid/grid.csv' \
+    --input 'pataslab/grid/grid.csv' \
     --title 'Grid Search Results' \
     --x-column in_neurons \
     --x-change 'int(X[i])*2' \
@@ -192,7 +192,7 @@ patas draw bars \
 
 ```shell
 patas draw lines \
-    --input patasout/grid/grid.csv \
+    --input pataslab/grid/grid.csv \
     --size 10 2 \
     --new-line \
     --x-column in_neurons \
@@ -207,7 +207,7 @@ patas draw lines \
 
 ```shell
 patas draw lines \
-    --input patasout/grid/grid.csv \
+    --input pataslab/grid/grid.csv \
     --title "Testing Title" \
     --x-label "x axis" \
     --r-label "y axis" \

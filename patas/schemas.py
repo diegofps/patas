@@ -473,7 +473,7 @@ class GridExperimentSchema(BaseExperimentSchema):
             "combination"    : task.combination     ,
             "max_tries"      : task.max_tries       ,
             "tries"          : task.tries           ,
-            "tries"       : []                   ,
+            "results"        : []                   ,
             "output_dir"     : task.output_dir      ,
             "work_dir"       : task.work_dir        ,
             "commands"       : task.commands        ,
@@ -484,7 +484,7 @@ class GridExperimentSchema(BaseExperimentSchema):
         for attempt in task.attempts:
             attempt = copy.copy(attempt)
             del attempt['stdout']
-            info['tries'].append(attempt)
+            info['results'].append(attempt)
         
         with open(info_filepath, "w") as fout:
             yaml.dump(info, fout, default_flow_style=False)
