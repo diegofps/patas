@@ -44,6 +44,8 @@ def parse_base_experiment(args, experiment:schemas.BaseExperimentSchema):
     if args.max_tries:
         experiment.max_tries = args.max_tries
 
+    if args.redo_tasks:
+        experiment.redo_tasks = args.redo_tasks
 
 def append_grid_experiment(args, experiments):
 
@@ -91,16 +93,16 @@ def append_cdeepso_experiment(args, experiments:list):
     parse_base_experiment(args, experiment)
     
     if args.score_pattern:
-        experiment.score = args.score_pattern
+        experiment.score_pattern = args.score_pattern
     
     if args.var_list:
-        warn("CdeepsoExperiment is not compatible with parameter --vl")
+        warn("CDEEPSOExperiment is not compatible with parameter --vl")
 
     if args.var_arithmetic:
-        warn("CdeepsoExperiment is not compatible with parameter --va")
+        warn("CDEEPSOExperiment is not compatible with parameter --va")
 
     if args.var_geometric:
-        warn("CdeepsoExperiment is not compatible with parameter --vg")
+        warn("CDEEPSOExperiment is not compatible with parameter --vg")
 
     if experiment.cmd and experiment.vars:
         experiments.append(experiment)
@@ -262,16 +264,15 @@ def do_explore(argv):
     for x in experiments:
         x.task_filters = task_filters.pop(x.name, [])
     
+    for idd, x in enumerate(experiments):
+        x.experiment_idd = idd
+
     if task_filters:
         names = ', '.join([x for x in task_filters])
-        warn(f"task-filters for the following experiments were not used: {names}")
+        warn(f"Ignoring task-filters for the following experiments: {names}")
 
-    gridexec = Scheduler(node_filters, args.output_folder, args.redo_tasks, args.confirmed, experiments, clusters)
-    gridexec.start()
-
-
-def do_explore_cdeepso(argv):
-    abort("CDEEPSO is not implemented yet.")
+    scheduler = Scheduler(node_filters, args.output_folder, args.redo_tasks, args.confirmed, experiments, clusters)
+    scheduler.start()
 
 
 def do_parse(argv):

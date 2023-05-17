@@ -1,8 +1,8 @@
 from subprocess import Popen, PIPE
 
+import pathlib
 import shutil
 import shlex
-import glob
 import sys
 import re
 import os
@@ -305,12 +305,13 @@ class PatasError(Exception):
         self.message = message
 
 
-def clean_folder(folderpath):
+def clean_folder(folderpath, quiet=False):
     
     if os.path.exists(folderpath):
         if os.path.isdir(folderpath):
-            for filepath in glob.glob(os.path.join(folderpath, '*')):
-                debug("  Removing:", filepath)
+            for filepath in pathlib.Path(folderpath).glob('*'):
+                if not quiet:
+                    debug("  Removing:", filepath)
                 if os.path.isdir(filepath):
                     shutil.rmtree(filepath)
                 else:

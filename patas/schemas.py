@@ -1,4 +1,4 @@
-from .utils import error, warn, clean_folder
+from .utils import error, warn, abort, clean_folder
 from functools import reduce
 
 import hashlib
@@ -20,7 +20,7 @@ def format_as_dict(obj):
         return (format_as_dict(x) for x in obj)
     
     if isinstance(obj, dict):
-        return { k:format_as_dict(v) for k,v in obj.items() if not k.startswith('_') }
+        return {k:format_as_dict(v) for k,v in obj.items() if not k.startswith('_')}
 
     return obj
 
@@ -43,9 +43,9 @@ class Task:
             repeat_idd, task_idd, combination, cmdlines, max_tries):
 
         self.experiment_name = experiment_name
+        self.output_dir      = task_output_dir
         self.combination_idd = combination_idd
         self.experiment_idd  = experiment_idd
-        self.output_dir      = task_output_dir
         self.combination     = combination
         self.repeat_idd      = repeat_idd
         self.max_tries       = max_tries
@@ -53,13 +53,8 @@ class Task:
         self.task_idd        = task_idd
         self.commands        = cmdlines
         self.assigned_to     = None
-        self.started_at      = None
-        self.ended_at        = None
-        self.duration        = None
         self.success         = None
-        self.output          = None
-        self.status          = None
-        self.env_variables   = {}
+        self.attempts        = []
         self.tries           = 0
     
     def __repr__(self):
@@ -72,6 +67,9 @@ class NodeSchema(Schema):
 
     def __init__(self, data=None):
         
+        self.cluster_idd = None
+        self.global_idd  = None
+
         self.name        = 'noname'
         self.private_key = None
         self._credential = None
@@ -118,6 +116,7 @@ class ClusterSchema(Schema):
 
     def __init__(self, data=None):
         
+        self.global_idd = None
         self.name = "default"
         self.nodes = []
 
@@ -237,14 +236,15 @@ class BaseExperimentSchema(Schema):
 
     def __init__(self):
         
-        self.task_filters = []
-        self.type         = 'base'
-        self.name         = None
-        self.workdir      = None
-        self.cmd          = []
-        self.max_tries    = 3
-        self.repeat       = 1
-        self.redo_tasks   = False
+        self.type           = 'base'
+        self.redo_tasks     = False
+        self.name           = None
+        self.workdir        = None
+        self.task_filters   = []
+        self.experiment_idd = None
+        self.cmd            = []
+        self.max_tries      = 3
+        self.repeat         = 1
 
     def init_from(self, data):
         
@@ -253,6 +253,9 @@ class BaseExperimentSchema(Schema):
         self.load_property('cmd', data, mandatory=True)
         self.load_property('max_tries', data)
         self.load_property('repeat', data)
+        self.load_property('redo_tasks', data)
+
+        # TODO: Load task filters
 
         if not isinstance(self.cmd, list):
             self.cmd = [self.cmd]
@@ -263,6 +266,24 @@ class BaseExperimentSchema(Schema):
         raise NotImplementedError()
         
     def show_summary(self):
+        raise NotImplementedError()
+
+    def check_signature(self, output_folder):
+        raise NotImplementedError()
+
+    def write_info(self):
+        raise NotImplementedError()
+
+    def clean_output(self):
+        raise NotImplementedError()
+
+    def on_start(self, scheduler):
+        raise NotImplementedError()
+
+    def on_task_completed(self, scheduler, task:Task):
+        raise NotImplementedError()
+
+    def on_finish(self):
         raise NotImplementedError()
 
 
@@ -302,15 +323,17 @@ class GridExperimentSchema(BaseExperimentSchema):
 
     def number_of_tasks(self):
         
-        return reduce(lambda a,b: a*len(b.values), self.vars) * self.repeat
+        return reduce(lambda a,b: a*len(b.values), self.vars, 1) * self.repeat
     
     def show_summary(self, indent=4):
 
-        combinations = reduce(lambda a,b: a*len(b.values), self.vars)
+        combinations = reduce(lambda a,b: a*len(b.values), self.vars, 1)
         tasks = combinations * self.repeat
+        filters = len(self.task_filters)
 
-        lines = [f"'{self.name}' has {len(self.vars)} variable(s), {combinations} combination(s), and {tasks} task(s):"] + \
-                [f"    {v.name} = {str(v.values)}, len = {len(v.values)}" for v in self.vars]
+        lines = [f"'{self.name}' has {len(self.vars)} variable(s), {combinations} combination(s), {tasks} task(s), and {filters} task-filter(s):"] + \
+                [f"    {v.name} = {str(v.values)}, len = {len(v.values)}" for v in self.vars] + \
+                [f"    task-filters = {self.task_filters}"]
         
         data = ' ' * indent + ('\n' + ' ' * indent).join(lines)
         print(data)
@@ -334,28 +357,41 @@ class GridExperimentSchema(BaseExperimentSchema):
 
     def check_signature(self, output_folder):
         
-        key = hashlib.md5()
-        key.update(str(format_as_dict(self.experiments)).encode())
-        signature = base64.b64encode(key.digest()).decode("utf-8")
-
-        # Folderpath to the place we will save the task results
+        # Define filepaths
 
         self.output_folder = os.path.join(output_folder, self.name)
+        self.info_filepath = os.path.join(self.output_folder, "info.yml")
 
-        # Data to be saved into the signature file
+        # Data to identify the signature
 
-        self.info = {
-            "name"         : self.name                                         ,
-            "type"         : self.type                                         ,
-            "commands"     : self.cmd                                          ,
-            "max_tries"    : self.max_tries                                    ,
-            "task_filters" : [{"from":a, "to":b} for a,b in self.task_filters] ,
-            "redo_tasks"   : self.redo_tasks                                   ,
+        signature_data = {
+            "type"      : self.type,
+            "commands"  : self.cmd,
+            "variables" : {v.name:v.values for v in self.vars},
+            "workdir"   : self.workdir
         }
 
-        # Load the previous signature file, if it exists
+        # Calculate signature
+        
+        key = hashlib.md5()
+        key.update(str(format_as_dict(signature_data)).encode())
+        signature = base64.b64encode(key.digest()).decode("utf-8")
 
-        self.info_filepath = os.path.join(self.output_folder, "info.yml")
+        # Data to represent the experiment
+
+        self.info = {
+            'name': self.name,
+            "type": self.type,
+            "commands": self.cmd,
+            "variables": {v.name:v.values for v in self.vars},
+            "workdir": self.workdir,
+            'task_filters': self.task_filters,
+            'signature': signature,
+            'commands': self.cmd,
+            'max_tries': self.max_tries,
+            'repeat': self.repeat,
+            'redo_tasks': self.redo_tasks,
+        }
 
         # Load previous signature, if it exists
 
@@ -365,15 +401,14 @@ class GridExperimentSchema(BaseExperimentSchema):
         except:
             other = None
 
-        # Return true if another signature exist and they do not match
+        # Return true if the signature do not exist or if they are the same
 
-        if other and "signature" in other and other["signature"] != signature:
-            return True
-        else:
-            return False
+        return not other or 'signature' not in other or other["signature"] == signature
 
-    def write_signature(self):
+    def write_info(self):
         
+        os.makedirs(self.output_folder, exist_ok=True)
+
         with open(self.info_filepath, "w") as fout:
             yaml.dump(self.info, fout, default_flow_style=False)
 
@@ -389,7 +424,7 @@ class GridExperimentSchema(BaseExperimentSchema):
         for combination in self._combinations(self.vars):
             combination_idd += 1
 
-            for repeat_idd in range(e.repeat):
+            for repeat_idd in range(self.repeat):
                 task_idd += 1
 
                 if self.task_filters and not any(a <= task_idd < b for a, b in self.task_filters):
@@ -406,13 +441,20 @@ class GridExperimentSchema(BaseExperimentSchema):
                 scheduler.push_task(task)
 
     def on_task_completed(self, scheduler, task:Task):
-        
-        # Create the task folder and clean any old .done file
 
-        done_filepath = os.path.join(task.output_dir, ".success")
+        # Define filepaths
+
+        success_filepath = os.path.join(task.output_dir, ".success")
+        failure_filepath = os.path.join(task.output_dir, ".failure")
+        info_filepath    = os.path.join(task.output_dir, "info.yml")
+                
+        # Create the task folder
+
         os.makedirs(task.output_dir, exist_ok=True)
-        if os.path.exists(done_filepath):
-            os.remove(done_filepath)
+        
+        # Clean anything inside the task folder
+
+        clean_folder(task.output_dir, quiet=True)
 
         # Dump task info
         
@@ -423,34 +465,43 @@ class GridExperimentSchema(BaseExperimentSchema):
             "experiment_name": task.experiment_name ,
             "combination_id" : task.combination_idd ,
             "combination"    : task.combination     ,
-            "started_at"     : task.started_at      ,
-            "ended_at"       : task.ended_at        ,
-            "duration"       : task.duration        ,
-            "env_variables"  : task.env_variables   ,
             "max_tries"      : task.max_tries       ,
             "tries"          : task.tries           ,
+            "attempts"       : []                   ,
             "output_dir"     : task.output_dir      ,
             "work_dir"       : task.work_dir        ,
             "commands"       : task.commands        ,
-            "status"         : task.status          ,
             "success"        : task.success         ,
             "assigned_to"    : task.assigned_to     ,
         }
 
-        filepath = os.path.join(task.output_dir, "info.yml")
-        with open(filepath, "w") as fout:
+        for attempt in task.attempts:
+            attempt = copy.copy(attempt)
+            del attempt['stdout']
+            info['attempts'].append(attempt)
+        
+        with open(info_filepath, "w") as fout:
             yaml.dump(info, fout, default_flow_style=False)
         
-        # Dump task output
+        # Dump fail and success outputs
 
-        filepath = os.path.join(task.output_dir, "stdout")
-        with open(filepath, "wb") as fout:
-            fout.write(task.output)
+        for i, attempt in enumerate(task.attempts):
+            attempt = task.attempts[i]
 
-        # Create .done file
+            if attempt['status'] == 0:
+                filepath = os.path.join(task.output_dir, f'success.stdout')
+            else:
+                filepath = os.path.join(task.output_dir, f'fail{i}.stdout')
+            
+            with open(filepath, "wb") as fout:
+                fout.write(attempt['stdout'])
+        
+        # Create .success or .failure file
 
-        with open(done_filepath, 'a'):
-            os.utime(done_filepath, None)
+        filepath = success_filepath if task.success else failure_filepath
+        
+        with open(filepath, 'a'):
+            os.utime(filepath, None)
 
     def on_finish(self):
         pass
@@ -461,13 +512,13 @@ class CDEEPSOExperimentSchema(BaseExperimentSchema):
     def __init__(self):
         
         super().__init__()
+        self.score_pattern = None
         self.type = 'cdeepso'
-        self.score = None
     
     def init_from(self, data):
 
         super().init_from(data)
-        self.load_property('score', data, mandatory=True)
+        self.load_property('score_pattern', data, mandatory=True)
         return self
 
 
@@ -480,7 +531,14 @@ def load_cluster(filepath):
 def load_experiment(filepath):
     with open(filepath, "r") as fin:
         data = yaml.load(fin, Loader=yaml.FullLoader)
-        return GridExperimentSchema().init_from(data)
+        if not 'type' in data:
+            data['type'] = 'grid'
+        if data['type'] == 'grid':
+            return GridExperimentSchema().init_from(data)
+        elif data['type'] == 'cdeepso':
+            return CDEEPSOExperimentSchema().init_from(data)
+        else:
+            abort(f'Invalid experiment type: {data["type"]}')
 
 
 def save_cluster(filepath:str, data:ClusterSchema):

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from random import gauss
+import time
 import sys
 
 # Read variable parameters
@@ -8,6 +9,14 @@ import sys
 hidden_neurons      = int(sys.argv[1]) if len(sys.argv) > 1 else 10
 activation_function = sys.argv[2]      if len(sys.argv) > 2 else 'relu'
 preprocessing_alg   = sys.argv[3]      if len(sys.argv) > 3 else 'fast'
+
+# Print parameters
+
+print('Input parameters:')
+print(f'  hidden_neurons: {hidden_neurons}')
+print(f'  activation_function: {activation_function}')
+print(f'  preprocessing_algorithm: {preprocessing_alg}')
+print()
 
 # Configurations that defines the model performance as a function of the input parameters
 
@@ -29,11 +38,16 @@ preprocessing_params = {
 act = activation_params[activation_function]
 pre = preprocessing_params[preprocessing_alg]
 
+import random
+if random.random() < 0.1:
+    raise ValueError()
+
 
 # Pretend we are loading and preparing the data
 
 print("Loading dataset...")
 print("Cleaning the data...")
+time.sleep(0.2)
 
 # Simulate that we are training during multiple epochs
 
@@ -62,7 +76,7 @@ test_time  = max(1, gauss(10, 4.0))
 
 # Consolidate results
 
-print("Results:")
+print("\nResults:")
 print(f"    Time to train (ms): {train_time:.3f}"    )
 print(f"    Time to test (ms):  {test_time:.3f}"     )
 print(f"    Train accuracy:     {train_accuracy:.3f}")

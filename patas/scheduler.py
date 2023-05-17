@@ -232,11 +232,13 @@ class SSHExecutor:
 
 class WorkerProcess:
 
-    def __init__(self, worker_idd, executor_builder, env_variables):
+    def __init__(self, worker_idd_in_world, worker_idd_in_cluster, worker_idd_in_node, executor_builder, env_variables):
 
+        self.worker_idd_in_cluster = worker_idd_in_cluster
+        self.worker_idd_in_world = worker_idd_in_world
+        self.worker_idd_in_node = worker_idd_in_node
         self.executor_builder = executor_builder
         self.env_variables = env_variables
-        self.worker_idd = worker_idd
         self.process = None
         self.queue = None
 
@@ -251,33 +253,33 @@ class WorkerProcess:
         try:
             executor = self.executor_builder()
 
-            msg_out = WorkerMessage("ready", self.worker_idd)
+            msg_out = WorkerMessage("ready", self.worker_idd_in_world)
             queue_master.put(msg_out)
             
             while True:
                 msg_in = queue_in.get()
 
                 if msg_in.action == "execute":
-                    success = self.execute(msg_in, executor)
 
-                    msg_out = WorkerMessage("finished", self.worker_idd)
-                    msg_out.success = success
+                    msg_out = WorkerMessage("finished", self.worker_idd_in_world)
+                    msg_out.task = self.execute(msg_in, executor)
                     queue_master.put(msg_out)
 
                     if not executor.is_alive:
                         executor = self.executor_builder()
 
-                    msg_out = WorkerMessage("ready", self.worker_idd)
+                    msg_out = WorkerMessage("ready", self.worker_idd_in_world)
                     queue_master.put(msg_out)
                 
                 elif msg_in.action == "terminate":
                     break
                 
                 else:
-                    warn("Unknown action:", msg_in.action)
+                    warn(f"Unknown action: {msg_in.action}")
             
-            msg_out = WorkerMessage("ended", self.worker_idd)
+            msg_out = WorkerMessage("ended", self.worker_idd_in_world)
             queue_master.put(msg_out)
+            
         except KeyboardInterrupt:
             pass
 
@@ -287,13 +289,14 @@ class WorkerProcess:
 
         # Prepare the initrc
 
-        task.env_variables = copy.copy(self.env_variables)
-        task.env_variables["PATAS_WORK_DIR"] = task.work_dir
+        env_variables = copy.copy(self.env_variables)
+        env_variables["PATAS_WORK_DIR"] = task.work_dir
+        env_variables["PATAS_ATTEMPT"] = str(task.tries + 1)
 
         for k,v in task.combination.items():
-            task.env_variables["PATAS_VAR_" + k] = str(v)
+            env_variables["PATAS_VAR_" + k] = str(v)
 
-        initrc = [b"export %s=\"%s\"" % (a.encode(), b.encode()) for a, b in task.env_variables.items()]
+        initrc = [b"export %s=\"%s\"" % (a.encode(), b.encode()) for a, b in env_variables.items()]
 
         if task.work_dir:
             initrc.insert(0, b"cd \"%s\"" % task.work_dir.encode())
@@ -304,14 +307,27 @@ class WorkerProcess:
 
         # Execute this task
 
-        task.started_at = datetime.now()
-        task.success, task.output, task.status = executor.execute(initrc, cmdline)
-        task.ended_at = datetime.now()
-        task.duration = (task.ended_at - task.started_at).total_seconds()
+        started_at = datetime.now()
+        task.success, stdout, status = executor.execute(initrc, cmdline)
+        ended_at = datetime.now()
+        duration = (ended_at - started_at).total_seconds()
 
+        # Add result to the task results
+
+        result = {
+            'env_variables': env_variables,
+            'started_at': started_at,
+            'ended_at': ended_at,
+            'duration': duration,
+            'stdout': stdout,
+            'status': status,
+        }
+
+        task.attempts.append(result)
+        
         # Return True if the task succeeded
 
-        return task.success
+        return task
 
 
 class Scheduler():
@@ -389,7 +405,7 @@ class Scheduler():
 
         # Check experiment signatures
 
-        issues = [x for x in experiments if x.check_signature(self.output_folder)]
+        issues = [x for x in experiments if not x.check_signature(self.output_folder)]
 
         if issues:
             names = ', '.join([x.name for x in issues])
@@ -415,20 +431,20 @@ class Scheduler():
         if issues:
             warn("Cleaning diverging experiments...")
             for experiment in issues:
-                experiment.clean_output(self.output_folder)
+                experiment.clean_output()
 
         # Write signature files
 
         for experiment in experiments:
-            experiment.write_signature(self.output_folder)
+            experiment.write_info()
 
     def _create_workers(self, clusters, node_filters):
 
         print("Creating workers...")
 
+        worker_idd_in_world = -1
+        node_idd_in_world = -1
         cluster_idd = -1
-        worker_idd = -1
-        node_idd = -1
 
         workers = []
 
@@ -436,19 +452,32 @@ class Scheduler():
         node:NodeSchema = None
 
         for cluster in clusters:
+
+            worker_idd_in_cluster = -1
+            node_idd_in_cluster = -1
             cluster_idd += 1
 
             for node in cluster.nodes:
-                node_idd += 1
+
+                worker_idd_in_node = -1
+                node_idd_in_cluster += 1
+                node_idd_in_world += 1
+
+                node.cluster_idd = node_idd_in_cluster
+                node.global_idd = node_idd_in_world
 
                 for _ in range(node.workers):
-                    worker_idd += 1
+
+                    worker_idd_in_cluster += 1
+                    worker_idd_in_world += 1
+                    worker_idd_in_node += 1
 
                     if node_filters and not any(all(tag in node.tags for tag in filter) for filter in node_filters):
                         continue
 
                     if node.hostname in ['localhost', '127.0.0.1']:
-                        builder = ExecutorBuilder(BashExecutor, node)    
+                        builder = ExecutorBuilder(BashExecutor, node)
+
                     else:
                         builder = ExecutorBuilder(SSHExecutor, node)
 
@@ -456,12 +485,15 @@ class Scheduler():
                         "PATAS_CLUSTER_NAME": cluster.name,
                         "PATAS_NODE_NAME": node.name,
 
-                        "PATAS_CLUSTER_ID": str(cluster_idd),
-                        "PATAS_NODE_ID": str(node_idd),
-                        "PATAS_WORKER_ID": str(worker_idd)
+                        "PATAS_CLUSTER_IN_WORLD": str(cluster_idd),
+                        "PATAS_NODE_IN_WORLD": str(node_idd_in_world),
+                        "PATAS_NODE_IN_CLUSTER": str(node_idd_in_cluster),
+                        "PATAS_WORKER_IN_WORLD": str(worker_idd_in_world),
+                        "PATAS_WORKER_IN_CLUSTER": str(worker_idd_in_cluster),
+                        "PATAS_WORKER_IN_NODE": str(worker_idd_in_node),
                     }
 
-                    worker = WorkerProcess(worker_idd, builder, env_variables)
+                    worker = WorkerProcess(worker_idd_in_world, worker_idd_in_cluster, worker_idd_in_node, builder, env_variables)
                     workers.append(worker)
         
         if not workers:
@@ -578,9 +610,6 @@ class Scheduler():
                     l1 = str(len(self.ended))
                     l2 = str(len(self.workers))
 
-                    l1 = " " * (chars_work - len(l1)) + l1
-                    l2 = " " * (chars_work - len(l2)) + l2
-
                     print("%s %sEnded %s / %s%s" % (d, colors.WHITE, l1, l2, colors.RESET))
                 
                 else:
@@ -632,26 +661,40 @@ class Scheduler():
             if x.assigned_to == msg_in.source:
                 break
         else:
-            warn("Received finished msg but the task was not found inside the doing list")
+            warn("Received finished event for a task that was not found inside the doing list")
             return
         
-        # Retrieve the task and experiment objects
+        # Retrieve the task we sent the worker
 
-        task:Task = self.doing[i]
-        task.tries += 1
+        task_sent:Task = self.doing[i]
+
+        # Retrieve the task we received back
+
+        task:Task = msg_in.task
+
+        # Check if they are the same, otherwise something weird is happening
+
+        if not task.task_idd == task_sent.task_idd:
+            warn("Received finished event for a task that was not the task we found in the doing list")
+            return
+    
+        # This is a valid task, proceed
+
         experiment = self.experiments[task.experiment_idd]
+        task.tries += 1
         del self.doing[i]
 
         # Print stdout if the task has failed
 
-        if not task.success:
-            warn("--- TASK %d FAILED WITH EXIT CODE %s ---" % (task.task_idd, task.status))
-            os.write(sys.stdout.fileno(), task.output)
+        if not task.success and task.attempts:
+            result = task.attempts[-1]
+            warn("--- TASK %d FAILED WITH EXIT CODE %s ---" % (task.task_idd, result['status']))
+            os.write(sys.stdout.fileno(), result['stdout'])
             warn("--- END OF FAILED OUTPUT ---")
 
         # If the task finished successfully, notify its experiment and move it to done
 
-        if msg_in.success:
+        if task.success:
             self.done.append(task)
             experiment.on_task_completed(self, task)
 
