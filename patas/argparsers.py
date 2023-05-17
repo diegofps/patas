@@ -1,7 +1,7 @@
 import argparse
 
 
-DEFAULT_PATAS_OUTPUT_DIR = './patasout'
+DEFAULT_PATAS_OUTPUT_DIR = './pataslab'
 
 
 def parse_patas_explore(argv):

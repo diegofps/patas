@@ -334,9 +334,9 @@ class GridExperimentSchema(BaseExperimentSchema):
         attrs = ['experiment_idd', 'redo_tasks', 'workdir', 'task_filters', 'cmd', 'max_tries', 'repeat']
 
         lines = [f"'{self.name}' has {len(self.vars)} variable(s), {combinations} combination(s), {tasks} task(s), and {filters} task-filter(s):"] + \
-                [f"  {name}: {getattr(self, name)}" for name in attrs] + \
-                ['  Variables:'] + \
-                [f"    {v.name} = {str(v.values)}, len = {len(v.values)}" for v in self.vars]
+                [f"    {name}: {getattr(self, name)}" for name in attrs] + \
+                [ '    Variables:'] + \
+                [f"        {v.name} = {str(v.values)}, len = {len(v.values)}" for v in self.vars]
         
         data = ' ' * indent + ('\n' + ' ' * indent).join(lines)
         print(data)
@@ -431,18 +431,20 @@ class GridExperimentSchema(BaseExperimentSchema):
             for repeat_idd in range(self.repeat):
                 task_idd += 1
 
-                if self.task_filters and not any(a <= task_idd < b for a, b in self.task_filters):
-                    continue
-
                 task_output_folder = os.path.join(self.output_folder, str(task_idd))
-
-                if not self.redo_tasks and os.path.exists(os.path.join(task_output_folder, ".success")):
-                    continue
 
                 cmds = [x.format(**combination) for x in self.cmd]
 
                 task = Task(self.name, task_output_folder, self.workdir, self.experiment_idd, combination_idd, repeat_idd, task_idd, combination, cmds, self.max_tries)
-                scheduler.push_task(task)
+
+                if self.task_filters and not any(a <= task_idd < b for a, b in self.task_filters):
+                    scheduler.push_filtered(task)
+
+                elif not self.redo_tasks and os.path.exists(os.path.join(task_output_folder, ".success")):
+                    scheduler.push_done(task)
+
+                else:
+                    scheduler.push_todo(task)
 
     def on_task_completed(self, scheduler, task:Task):
 

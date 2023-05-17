@@ -238,10 +238,10 @@ class SSHExecutor:
 
 class WorkerProcess:
 
-    def __init__(self, worker_idd_in_world, worker_idd_in_cluster, worker_idd_in_node, executor_builder, env_variables):
+    def __init__(self, worker_idd_in_lab, worker_idd_in_cluster, worker_idd_in_node, executor_builder, env_variables):
 
+        self.worker_idd_in_lab = worker_idd_in_lab
         self.worker_idd_in_cluster = worker_idd_in_cluster
-        self.worker_idd_in_world = worker_idd_in_world
         self.worker_idd_in_node = worker_idd_in_node
         self.executor_builder = executor_builder
         self.env_variables = env_variables
@@ -259,7 +259,7 @@ class WorkerProcess:
         try:
             executor = self.executor_builder()
 
-            msg_out = WorkerMessage("ready", self.worker_idd_in_world)
+            msg_out = WorkerMessage("ready", self.worker_idd_in_lab)
             queue_master.put(msg_out)
             
             while True:
@@ -267,14 +267,14 @@ class WorkerProcess:
 
                 if msg_in.action == "execute":
 
-                    msg_out = WorkerMessage("finished", self.worker_idd_in_world)
+                    msg_out = WorkerMessage("finished", self.worker_idd_in_lab)
                     msg_out.task = self.execute(msg_in, executor)
                     queue_master.put(msg_out)
 
                     if not executor.is_alive:
                         executor = self.executor_builder()
 
-                    msg_out = WorkerMessage("ready", self.worker_idd_in_world)
+                    msg_out = WorkerMessage("ready", self.worker_idd_in_lab)
                     queue_master.put(msg_out)
                 
                 elif msg_in.action == "terminate":
@@ -283,7 +283,7 @@ class WorkerProcess:
                 else:
                     warn(f"Unknown action: {msg_in.action}")
             
-            msg_out = WorkerMessage("ended", self.worker_idd_in_world)
+            msg_out = WorkerMessage("ended", self.worker_idd_in_lab)
             queue_master.put(msg_out)
             
         except KeyboardInterrupt:
@@ -363,8 +363,14 @@ class Scheduler():
         self.workers = self._create_workers(self.clusters, self.node_filters)
         self._exec()
 
-    def push_task(self, task):
+    def push_todo(self, task):
         self.todo.append(task)
+
+    def push_done(self, task):
+        self.done.append(task)
+
+    def push_filtered(self, task):
+        self.filtered.append(task)
 
     def show_summary(self, experiments, clusters, confirmed):
 
@@ -406,14 +412,6 @@ class Scheduler():
 
         print()
 
-        print('Estimated time to complete if each task takes:')
-        print(f"    One second: { estimate(total_tasks, total_workers,        1) }")
-        print(f"    One minute: { estimate(total_tasks, total_workers,       60) }")
-        print(f"    One hour:   { estimate(total_tasks, total_workers,    60*60) }")
-        print(f"    One day:    { estimate(total_tasks, total_workers, 60*60*24) }")
-
-        print()
-
         # Check experiment signatures
 
         issues = [x for x in experiments if not x.check_signature(self.output_folder)]
@@ -443,8 +441,8 @@ class Scheduler():
 
         print("Creating workers...")
 
-        worker_idd_in_world = -1
-        node_idd_in_world = -1
+        worker_idd_in_lab = -1
+        node_idd_in_lab = -1
         cluster_idd = -1
 
         workers = []
@@ -462,15 +460,15 @@ class Scheduler():
 
                 worker_idd_in_node = -1
                 node_idd_in_cluster += 1
-                node_idd_in_world += 1
+                node_idd_in_lab += 1
 
                 node.cluster_idd = node_idd_in_cluster
-                node.global_idd = node_idd_in_world
+                node.global_idd = node_idd_in_lab
 
                 for _ in range(node.workers):
 
                     worker_idd_in_cluster += 1
-                    worker_idd_in_world += 1
+                    worker_idd_in_lab += 1
                     worker_idd_in_node += 1
 
                     if node_filters and not any(all(tag in node.tags for tag in filter) for filter in node_filters):
@@ -486,15 +484,15 @@ class Scheduler():
                         "PATAS_CLUSTER_NAME": cluster.name,
                         "PATAS_NODE_NAME":    node.name,
 
-                        "PATAS_CLUSTER_IN_WORLD":  str(cluster_idd),
-                        "PATAS_NODE_IN_WORLD":     str(node_idd_in_world),
+                        "PATAS_CLUSTER_IN_LAB":  str(cluster_idd),
+                        "PATAS_NODE_IN_LAB":     str(node_idd_in_lab),
                         "PATAS_NODE_IN_CLUSTER":   str(node_idd_in_cluster),
-                        "PATAS_WORKER_IN_WORLD":   str(worker_idd_in_world),
+                        "PATAS_WORKER_IN_LAB":   str(worker_idd_in_lab),
                         "PATAS_WORKER_IN_CLUSTER": str(worker_idd_in_cluster),
                         "PATAS_WORKER_IN_NODE":    str(worker_idd_in_node),
                     }
 
-                    worker = WorkerProcess(worker_idd_in_world, worker_idd_in_cluster, worker_idd_in_node, builder, env_variables)
+                    worker = WorkerProcess(worker_idd_in_lab, worker_idd_in_cluster, worker_idd_in_node, builder, env_variables)
                     workers.append(worker)
         
         if not workers:
@@ -510,6 +508,7 @@ class Scheduler():
         self.doing    = []
         self.done     = []
         self.given_up = []
+        self.filtered = []
 
         self.idle     = []
         self.ended    = []
@@ -529,8 +528,13 @@ class Scheduler():
 
         # Start experiments
 
+        print()
+        info(f"Starting {len(self.experiments)} experiment(s)")
+        
         for experiment in self.experiments:
             experiment.on_start(self)
+        
+        info("Experiment(s) started")
 
         # Main loop
 
@@ -539,7 +543,7 @@ class Scheduler():
         try:
 
             print()
-            info("Starting main loop")
+            info("Starting main loop...")
 
             while self.todo or self.doing:
 
@@ -550,14 +554,16 @@ class Scheduler():
                     l2 = str(len(self.doing   ))
                     l3 = str(len(self.done    ))
                     l4 = str(len(self.given_up))
+                    l5 = str(len(self.filtered))
 
-                    d  = colors.gray("|%s|" % str(datetime.now()))
-                    l1 = colors.white(" " * (chars_todo - len(l1)) + l1 + " |")
-                    l2 = colors.white(" " * (chars_work - len(l2)) + l2 + " |")
-                    l3 = colors.green(" " * (chars_todo - len(l3)) + l3 + " |")
-                    l4 = colors.red  (" " * (chars_todo - len(l4)) + l4 + " |")
+                    d  = colors.gray  ("|%s|" % str(datetime.now()))
+                    l1 = colors.white ('TODO:'     + " " * (chars_todo - len(l1)) + l1 + " |")
+                    l2 = colors.green ('DOING:'    + " " * (chars_work - len(l2)) + l2 + " |")
+                    l3 = colors.blue  ('DONE:'     + " " * (chars_todo - len(l3)) + l3 + " |")
+                    l4 = colors.red   ('GIVEN_UP:' + " " * (chars_todo - len(l4)) + l4 + " |")
+                    l5 = colors.purple('FILTERED:' + " " * (chars_todo - len(l5)) + l5 + " |")
 
-                    print(f"{d} {l1} {l2} {l3} {l4}")
+                    print(f"{d} {l1} {l2} {l3} {l4} {l5}")
 
                 if msg_in.action == "ready":
                     self._on_worker_is_ready(msg_in)
@@ -604,17 +610,8 @@ class Scheduler():
                 msg = self.queue.get()
 
                 if msg.action == "ended":
-
                     self.ended.append(msg.source)
 
-                    # d = colors.gray("|%s|" % str(datetime.now()))
-
-                    # l1 = str(len(self.ended))
-                    # l2 = str(len(self.workers))
-
-                    # if not self.quiet:
-                    #     print("%s %sEnded %s / %s%s" % (d, colors.WHITE, l1, l2, colors.RESET))
-                
                 else:
                     #debug("Ignoring action %s from %s, execution is ending" % (msg.source, msg.action))
                     pass
@@ -649,6 +646,7 @@ class Scheduler():
     def _on_worker_is_ready(self, msg_in):
 
         # If there is a task to be done, send it back to the worker
+
         if self.todo:
             msg_out = WorkerMessage("execute")
             msg_out.task = self.todo.pop()
