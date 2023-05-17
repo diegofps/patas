@@ -39,7 +39,7 @@ act = activation_params[activation_function]
 pre = preprocessing_params[preprocessing_alg]
 
 import random
-if random.random() < 0.1:
+if random.random() < 0.15:
     raise ValueError()
 
 

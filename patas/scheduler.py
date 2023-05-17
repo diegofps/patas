@@ -73,13 +73,19 @@ class BashExecutor:
         p3 = b" ; ".join(cmds)
 
         cmd_str = b" %s ; %s " % (p1, p3)
-        cmd_str = "bash -c " + quote(cmd_str.decode('utf-8'))
+        cmd_str = cmd_str.decode('utf-8')
+        cmd_str = " bash -c " + quote(cmd_str)
+        # print(cmd_str)
         
         ps = Popen(shlex.split(cmd_str), stdout=PIPE, stderr=STDOUT)
+        stdout, _ = ps.communicate()
+        status = ps.returncode
+        # print(status)
 
-        status = ps.wait()
-        stdout = ps.stdout.read()
+        # status = ps.wait()
+        # stdout = ps.stdout.read()
 
+        # print("after wait")
         return (status == 0), stdout, status
 
 
@@ -244,7 +250,7 @@ class WorkerProcess:
 
     def start(self, queue_master):
 
-        self.queue = Queue()
+        self.queue   = Queue()
         self.process = Process(target=self.run, args=(self.queue, queue_master))
         self.process.start()
 
@@ -301,16 +307,20 @@ class WorkerProcess:
         if task.work_dir:
             initrc.insert(0, b"cd \"%s\"" % task.work_dir.encode())
 
+        initrc.insert(0, b'set -e')
+
         # Prepare the command line we will execute
 
         cmdline = " ; ".join(task.commands).encode()
 
         # Execute this task
 
+        # sys.stdout.write(f"{self.worker_idd_in_world} is starting cmd {cmdline}\n")
         started_at = datetime.now()
         task.success, stdout, status = executor.execute(initrc, cmdline)
         ended_at = datetime.now()
         duration = (ended_at - started_at).total_seconds()
+        # sys.stdout.write(f"{self.worker_idd_in_world} ended command\n")
 
         # Add result to the task results
 
@@ -647,16 +657,16 @@ class Scheduler():
             self.doing.append(msg_out.task)
             self.workers[msg_in.source].queue.put(msg_out)
 
-            if not self.quiet:
-                print(f"Sending task {msg_out.task.task_idd} to worker {msg_in.source}")
+            # if not self.quiet:
+            #     print(f"Sending task {msg_out.task.task_idd} to worker {msg_in.source}")
         
         # Otherwise, move the worker to the like of idle workers
 
         else:
             self.idle.append(msg_in.source)
 
-            if not self.quiet:
-                print(f"Moving worker {msg_in.source} to idle")
+            # if not self.quiet:
+            #     print(f"Moving worker {msg_in.source} to idle")
 
     def _on_task_finished(self, msg_in):
 
@@ -703,8 +713,8 @@ class Scheduler():
             self.done.append(task)
             experiment.on_task_completed(self, task)
 
-            if not self.quiet:
-                print(f"Moving task {task.task_idd} to done")
+            # if not self.quiet:
+            #     print(f"Moving task {task.task_idd} to done")
 
         # If max_tries has been reached, notify the experiment and move it to given_up
 
@@ -726,13 +736,13 @@ class Scheduler():
 
             self.workers[worker_idd].queue.put(msg_out)
 
-            if not self.quiet:
-                print(f"Reassigning task {task.task_idd} to new worker {worker_idd} after fail")
+            # if not self.quiet:
+            #     print(f"Reassigning task {task.task_idd} to new worker {worker_idd} after fail")
 
         # Otherwise, move the task back to todo, we will schedule it again in the future
 
         else:
             self.todo.append(task)
 
-            if not self.quiet:
-                print(f"No worker available to retry task {task.task_idd}, moving it back to todo")
+            # if not self.quiet:
+            #     print(f"No worker available to retry task {task.task_idd}, moving it back to todo")

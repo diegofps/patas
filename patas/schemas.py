@@ -371,7 +371,8 @@ class GridExperimentSchema(BaseExperimentSchema):
             "type"      : self.type,
             "commands"  : self.cmd,
             "variables" : {v.name:v.values for v in self.vars},
-            "workdir"   : self.workdir
+            "workdir"   : self.workdir,
+            "repeat"    : self.repeat
         }
 
         # Calculate signature
