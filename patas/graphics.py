@@ -86,8 +86,8 @@ def render_heatmap(x_column, y_column, z_column,
         plt.show()
 
 
-def render_categorical(x_column, y_column, hue_column,
-                       title, x_label, y_label, hue_label,
+def render_categories(x_column, y_column, hue_column,
+                       title, x_label, y_label, legend_label,
                        x_change, y_change, hue_change, 
                        input_file, output_file, 
                        fig_size, errorbar):
@@ -95,9 +95,9 @@ def render_categorical(x_column, y_column, hue_column,
     data_long = pd.read_csv(input_file)
 
     cc = ColumnsChanger()
-    cc.add(x_change, x_column, 'X', 'patas.draw.heatmap.x_change', True)
-    cc.add(y_change, y_column, 'Y', 'patas.draw.heatmap.y_change', True)
-    cc.add(hue_change, hue_column, 'HUE', 'patas.draw.heatmap.hue_change', False)
+    cc.add(x_change, x_column, 'X', 'patas.draw.categorical.x_change', True)
+    cc.add(y_change, y_column, 'Y', 'patas.draw.categorical.y_change', True)
+    cc.add(hue_change, hue_column, 'H', 'patas.draw.categorical.hue_change', False)
     cc.apply(data_long)
 
     g = sns.catplot(data=data_long, kind="bar", x=x_column, y=y_column, hue=hue_column, errorbar=errorbar)
@@ -108,8 +108,8 @@ def render_categorical(x_column, y_column, hue_column,
     g.despine(left=True)
     g.fig.subplots_adjust(left=.08, bottom=.14)
 
-    if hue_label:
-        g.legend.set_title(hue_label)
+    if legend_label:
+        g.legend.set_title(legend_label)
 
     if x_label:
         g.ax.set_xlabel(x_label)
@@ -127,21 +127,53 @@ def render_categorical(x_column, y_column, hue_column,
         plt.show()
 
 
-def render_lines(lines, title, size, 
-                 x_label, r_label, 
+def render_lines(title, x_label, y_label, legend_label, 
+                 x_column, y_column, hue_column, style_column, 
+                 x_change, y_change, hue_change, style_change, 
                  input_file, output_file, 
-                 show_grid, border, show_error, 
-                 ticks, ticks_format, legend_location,
-                 verbose):
+                 fig_size, err_style, errorbar):
     
-    # Remove borders and display/save
+    data_long = pd.read_csv(input_file)
 
-    fig.tight_layout()
+    cc = ColumnsChanger()
+    cc.add(x_change, x_column, 'X', 'patas.draw.lines.x_change', True)
+    cc.add(y_change, y_column, 'Y', 'patas.draw.lines.y_change', True)
+    cc.add(hue_change, hue_column, 'H', 'patas.draw.lines.hue_change', False)
+    cc.add(style_change, style_column, 'S', 'patas.draw.lines.style_change', False)
+    cc.apply(data_long)
+
+    ax = sns.lineplot(data=data_long, 
+                     x=x_column, y=y_column, hue=hue_column, style=style_column,
+                     err_style=err_style, errorbar=errorbar)
+
+    fig = ax.get_figure()
+
+    ax.set(xticks=data_long[x_column].unique())
+
+    if fig_size:
+        fig.set_size_inches(*fig_size)
+        
+    fig.subplots_adjust(left=.08, bottom=.14)
+
+    if title:
+        fig.subplots_adjust(top=.9)
+        ax.set_title(title)
+
+    if x_label:
+        ax.set_xlabel(x_label)
+    
+    if y_label:
+        ax.set_ylabel(y_label)
+
+    if legend_label:
+        ax.get_legend().set_title(legend_label)
+
+    # if style_label:
+    #     g.legend.set_title(hue_label)
 
     if output_file:
         plt.savefig(output_file)
     else:
         plt.show()
-
 
 

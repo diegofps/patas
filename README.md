@@ -112,7 +112,7 @@ A possible output for the previous command would be.
 
 ## patas draw
 
-Patas can also help you quickly create basic graphics based on the data in the csv file. It provides a wrapper for a few seaborn functions to quickly generate graphics, without needing to create a python script for this. If you need complex charts, though, we recommend you use the advanced graphics library of your preference. As of now, patas provides four drawing functions: `heatmap`, `categorical`, `bars`, and `lines`.
+Patas can also help you quickly create basic graphics based on the data in the csv file. It provides a wrapper for a few seaborn functions to quickly generate graphics, without needing to create a python script for this. If you need complex charts, though, we recommend you use the advanced graphics library of your preference. As of now, patas provides three drawing functions: `heatmap`, `categorical`, and `lines`.
 
 ### Heatmap
 
@@ -152,7 +152,7 @@ patas draw heatmap \
 ### Categorical
 
 ```shell
-patas draw categorical \
+patas draw categories \
     --input pataslab/grid/grid.csv \
     --x-column in_activation \
     --y-column out_test_acc \
@@ -162,10 +162,10 @@ patas draw categorical \
     --title 'Test performance by activation function'
 ```
 
-![Bars example](https://github.com/diegofps/patas/blob/main/docs/images/categorical1.png?raw=true)
+![Categorical example](https://github.com/diegofps/patas/blob/main/docs/images/categorical1.png?raw=true)
 
 ```shell
-patas draw categorical \
+patas draw categories \
     --input pataslab/grid/grid.csv \
     --x-column in_activation \
     --hue-column in_preprocessing \
@@ -173,98 +173,46 @@ patas draw categorical \
     --fig-size 10 4 \
     --x-label 'Activation function' \
     --y-label 'Test Accuracy' \
-    --hue-label 'Preprocessing' \
+    --legend-label 'Preprocessing' \
     --errorbar 'sd' \
     --title 'Test performance by activation function and preprocessing'
 ```
 
-![Bars example](https://github.com/diegofps/patas/blob/main/docs/images/categorical2.png?raw=true)
-
-### Bars
-
-```shell
-patas query 'select * from grid where in_activation="relu"' > test.csv
-```
-
-```shell
-patas draw bars \
-    --input test.csv \
-    --x-column in_neurons \
-    --y-column out_test_acc \
-    --size 10 4
-```
-
-![Bars example](https://github.com/diegofps/patas/blob/main/docs/images/bars1.png?raw=true)
-
-```shell
-patas draw bars \
-    --input test.csv \
-    --title 'Performance using the function relu' \
-    --x-column in_neurons \
-    --x-change 'int(float(X[i]))' \
-    --x-label 'Neurons' \
-    --y-column out_test_acc \
-    --y-change 'round(Y[i]*100)/100' \
-    --r-function mean \
-    --r-format 'R[i]:.2f' \
-    --r-label 'Accuracy' \
-    --size 10 2 \
-    --bar-size 0.8 \
-    --bar-color B00020 \
-    --show-grid \
-    --show-error \
-    --ticks 5 \
-    --ticks-format 'T[i]:.2f' \
-    --border none
-```
-
-![Bars example](https://github.com/diegofps/patas/blob/main/docs/images/bars2.png?raw=true)
+![Categorical example](https://github.com/diegofps/patas/blob/main/docs/images/categorical2.png?raw=true)
 
 ### Lines
 
 ```shell
 patas draw lines \
-    --input pataslab/grid/grid.csv \
-    --size 10 2 \
-    --new-line \
-    --x-column in_neurons \
-    --y-column out_test_acc \
-    \
-    --new-line \
-    --x-column in_neurons \
-    --y-column out_train_acc
+    --input 'pataslab/grid/grid.csv' \
+    --fig-size 10 4 \
+    --x-column 'in_neurons' \
+    --x-label 'Neurons' \
+    --y-column 'out_test_acc' \
+    --y-label 'Accuracy' \
+    --title 'Average test accuracy' \
+    --err-style 'bars' \
+    --errorbar 'sd'
 ```
 
 ![Lines example](https://github.com/diegofps/patas/blob/main/docs/images/lines1.png?raw=true)
 
 ```shell
 patas draw lines \
-    --input pataslab/grid/grid.csv \
-    --title "Testing Title" \
-    --x-label "x axis" \
-    --r-label "y axis" \
-    --size 10 2 \
-    --show-grid \
-    --border none \
-    --ticks 5 \
-    --ticks-format 'T[i]:.2f' \
-    \
-    --new-line \
-    --label 'Test accuracy' \
-    --x-column in_neurons \
-    --y-column out_test_acc \
-    --style dash \
-    --marker diamond \
-    \
-    --new-line \
-    --label 'Train accuracy' \
-    --x-column in_neurons \
-    --y-column out_train_acc \
-    --style dot \
-    --marker circle
+    --input 'pataslab/grid/grid.csv' \
+    --fig-size 10 4 \
+    --x-column 'in_neurons' \
+    --x-label 'Neurons' \
+    --y-column 'out_test_acc' \
+    --y-label 'Accuracy' \
+    --hue-column 'in_activation' \
+    --title 'Average test accuracy' \
+    --legend-label 'Act. Function' \
+    --err-style 'band' \
+    --errorbar 'sd'
 ```
 
-![Extended lines example](https://github.com/diegofps/patas/blob/main/docs/images/lines2.png?raw=true)
+![Lines example](https://github.com/diegofps/patas/blob/main/docs/images/lines2.png?raw=true)
 
 # Documentation 📚
 

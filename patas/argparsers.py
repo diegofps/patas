@@ -373,31 +373,16 @@ def parse_patas_draw_heatmap(argv):
                         default=False,
                         action='store_true')
 
-    # parser.add_argument('--colormap', 
-    #                     type=str, 
-    #                     dest='colormap',
-    #                     nargs='*',
-    #                     metavar=('NAME|C1', 'C2...'),
-    #                     help='list of HTML colors without # or name of colormap from https://matplotlib.org/stable/tutorials/colors/colormaps.html',
-    #                     action='store')
-
     return parser.parse_args(args=argv)
 
 
-def parse_patas_draw_categorical(argv):
+def parse_patas_draw_categories(argv):
 
     parser = argparse.ArgumentParser(
-                        prog='patas draw bars',
+                        prog='patas draw categories',
                         description='Draws bars from a csv file',
                         epilog="Check the README.md to learn more tips on how to use this feature: https://github.com/diegofps/patas/blob/main/README.md",
                         formatter_class=argparse.RawDescriptionHelpFormatter)
-
-    # x_column, y_column, hue_column,
-    # title, x_label, y_label, hue_label,
-    # x_change, y_change, hue_change, 
-    # input_file, output_file, 
-    # fig_size, aggfunc, 
-    # errorbar
 
     # INITIAL PARAMETERS
 
@@ -407,6 +392,13 @@ def parse_patas_draw_categorical(argv):
                         metavar='FILEPATH',
                         dest='input_file',
                         help='filepath to the csv file containing the data',
+                        action='store')
+
+    parser.add_argument('--output', 
+                        type=str, 
+                        metavar='FILEPATH',
+                        dest='output_file',
+                        help='filepath of output file to save the image. If not present, the result will be displayed',
                         action='store')
 
     parser.add_argument('--x-column', 
@@ -453,18 +445,11 @@ def parse_patas_draw_categorical(argv):
                         help='label for the y axis',
                         action='store')
 
-    parser.add_argument('--hue-label', 
+    parser.add_argument('--legend-label', 
                         type=str, 
-                        dest='hue_label',
+                        dest='legend_label',
                         metavar='L',
-                        help='label for the hue legend',
-                        action='store')
-
-    parser.add_argument('--output', 
-                        type=str, 
-                        metavar='FILEPATH',
-                        dest='output_file',
-                        help='filepath of output file to save the image. If not present, the result will be displayed',
+                        help='label for the legend',
                         action='store')
 
     parser.add_argument('--x-change', 
@@ -485,17 +470,8 @@ def parse_patas_draw_categorical(argv):
                         type=str, 
                         metavar='CODE',
                         dest='hue_change',
-                        help='transforms the hue column. For example: --y-change "math.log2(Y[i])"',
+                        help='transforms the hue column. For example: --hue-change "math.log2(H[i])"',
                         action='store')
-
-    # parser.add_argument('--aggfunc', 
-    #                     type=str, 
-    #                     choices=('sum', 'mean', 'std', 'product', 'min', 'max', 'count'),
-    #                     default='mean',
-    #                     dest='aggfunc',
-    #                     metavar='NAME',
-    #                     help='when a single x value maps to multiple values, use this function to reduce them.',
-    #                     action='store')
 
     parser.add_argument('--fig-size', 
                         type=float, 
@@ -517,12 +493,11 @@ def parse_patas_draw_categorical(argv):
 
 def parse_patas_draw_lines(argv):
 
-    parser = ArgumentParser2(
+    parser = argparse.ArgumentParser(
                         prog='patas draw lines',
                         description='Draws lines from a csv file',
                         epilog="Check the README.md to learn more tips on how to use this feature: https://github.com/diegofps/patas/blob/main/README.md",
                         formatter_class=argparse.RawDescriptionHelpFormatter)
-
 
     # GENERAL PARAMETERS
 
@@ -532,6 +507,13 @@ def parse_patas_draw_lines(argv):
                         metavar='FILEPATH',
                         dest='input_file',
                         help='filepath to the csv file containing the data',
+                        action='store')
+
+    parser.add_argument('--output', 
+                        type=str, 
+                        metavar='FILEPATH',
+                        dest='output_file',
+                        help='filepath of output file to save the image. If not present, the result will be displayed',
                         action='store')
 
     parser.add_argument('--title', 
@@ -548,169 +530,102 @@ def parse_patas_draw_lines(argv):
                         help='label for the x axis',
                         action='store')
 
-    parser.add_argument('--r-label', 
+    parser.add_argument('--y-label', 
                         type=str, 
-                        dest='r_label',
+                        dest='y_label',
                         metavar='L',
-                        help='label for the reduced values',
+                        help='label for the y axis',
                         action='store')
 
-    parser.add_argument('--output', 
+    parser.add_argument('--legend-label', 
                         type=str, 
-                        metavar='FILEPATH',
-                        dest='output_file',
-                        help='filepath of output file to save the image. If not present, the result will be displayed',
+                        dest='legend_label',
+                        metavar='L',
+                        help='label for the legend',
                         action='store')
-
-    parser.add_argument('--size', 
-                        type=float, 
-                        nargs=2, 
-                        dest='size',
-                        metavar='W H',
-                        help='size of output image',
-                        action='store')
-
-    parser.add_argument('--verbose', 
-                        help='print extra info during execution',
-                        action='store_true')
-
-    parser.add_argument('--border', 
-                        type=str,
-                        choices=('all', 'ticks', 'lines', 'none'),
-                        dest='border',
-                        metavar='MODE',
-                        help='style of the border, default is all',
-                        action='store')
-
-    parser.add_argument('--ticks', 
-                        type=int, 
-                        dest='ticks',
-                        metavar='T',
-                        help='number of values to appear in the axis',
-                        action='store')
-
-    parser.add_argument('--ticks-format', 
-                        type=str,  
-                        metavar='CODE',
-                        dest='ticks_format',
-                        help='formats tick display value using its current value t. Example: --ticks-format \'t:02f\'',
-                        action='store')
-
-    parser.add_argument('--legend-location', 
-                        type=str, 
-                        choices=('tr', 'tl', 'bl', 'br', 'cr', 'cl', 'tc', 'bc', 'cc', 'c'),
-                        default=None,
-                        dest='legend_location',
-                        metavar='YX',
-                        help='Position of the legend (t=top, b=bottom, c=center, r=right, l=left)',
-                        action='store')
-
-    parser.add_argument('--show-grid', 
-                        dest='show_grid', 
-                        help='set this flag if you want gridlines displayed', 
-                        action='store_true')
-
-    parser.add_argument('--show-error',  
-                        dest='show_error',
-                        help='set this flag if you want the standard deviation to be shown',
-                        action='store_true')
-
-
-    # LINE PARAMETERS
-
-    parser.add_argument_group('Line parameters')
-
-    lines = parser.add_argument('--new-line', 
-                                dest='lines',
-                                help='begin definition of a new line',
-                                action='create_context')
 
     parser.add_argument('--x-column', 
                         type=str, 
+                        required=True, 
+                        metavar='NAME',
                         dest='x_column',
-                        metavar='X_COLUMN',
                         help='name of the x column in the data source',
-                        action='store',
-                        context=lines)
+                        action='store')
 
     parser.add_argument('--y-column', 
                         type=str, 
-                        metavar='Y_COLUMN',
+                        required=True, 
+                        metavar='NAME',
                         dest='y_column',
                         help='name of the y column in the data source',
-                        action='store',
-                        context=lines)
+                        action='store')
+
+    parser.add_argument('--hue-column', 
+                        type=str, 
+                        metavar='NAME',
+                        dest='hue_column',
+                        help='name of the hue column in the data source, if necessary',
+                        action='store')
+
+    parser.add_argument('--style-column', 
+                        type=str, 
+                        metavar='NAME',
+                        dest='style_column',
+                        help='name of the style column in the data source, if necessary',
+                        action='store')
 
     parser.add_argument('--x-change', 
                         type=str, 
                         metavar='CODE',
                         dest='x_change',
-                        default=None,
                         help='transforms the x column. For example: --x-change "math.log2(X[i])"',
-                        action='store',
-                        context=lines)
+                        action='store')
 
     parser.add_argument('--y-change', 
                         type=str, 
                         metavar='CODE',
                         dest='y_change',
                         help='transforms the y column. For example: --y-change "math.log2(Y[i])"',
-                        action='store',
-                        context=lines)
+                        action='store')
 
-    parser.add_argument('--r-function', 
+    parser.add_argument('--hue-change', 
                         type=str, 
-                        choices=('sum', 'mean', 'std', 'product', 'min', 'max'),
-                        default='mean',
-                        dest='r_function',
-                        metavar='NAME',
-                        help='each x value will usualy map to multiple values, this function defines how to reduce them.',
-                        action='store',
-                        context=lines)
+                        metavar='CODE',
+                        dest='hue_change',
+                        help='transforms the hue column. For example: --hue-change "math.log2(H[i])"',
+                        action='store')
 
-    parser.add_argument('--label', 
+    parser.add_argument('--style-change', 
                         type=str, 
-                        dest='label',
-                        metavar='NAME',
-                        help='label representing this line in the legend',
-                        action='store',
-                        context=lines)
+                        metavar='CODE',
+                        dest='style_change',
+                        help='transforms the style column. For example: --style-change "math.log2(S[i])"',
+                        action='store')
 
-    parser.add_argument('--style', 
-                        type=str, 
-                        choices=('solid', 'dash', 'dashdot', 'dot'),
-                        default=None,
-                        dest='style',
-                        metavar='NAME',
-                        help='style used to draw the line',
-                        action='store',
-                        context=lines)
-
-    parser.add_argument('--marker', 
-                        type=str, 
-                        choices=('point', 'circle', 'x', 'diamond', 'hexagon', 'square', 'plus'),
-                        default=None,
-                        dest='marker',
-                        metavar='NAME',
-                        help='marker used to highlight the points in the line',
-                        action='store',
-                        context=lines)
-
-    parser.add_argument('--marker-size', 
+    parser.add_argument('--fig-size', 
                         type=float, 
-                        default=5,
-                        dest='marker_size',
-                        metavar='FLOAT',
-                        help='size of the marker',
-                        action='store',
-                        context=lines)
+                        nargs=2, 
+                        dest='fig_size',
+                        metavar='W H',
+                        help='size of output image',
+                        action='store')
 
+    parser.add_argument('--errorbar',  
+                        dest='errorbar',
+                        choices=("sd", "se", "pi", "ci"),
+                        default=None,
+                        help='show error: standard deviation, standard error, percentile interval or confidence interval',
+                        action='store')
 
+    parser.add_argument('--err-style',  
+                        dest='err_style',
+                        default='band',
+                        choices=('band', 'bars'),
+                        help='set the err_style to render: band or bars',
+                        action='store')
 
     args = parser.parse_args(args=argv)
 
-    print(args)
-    
     return args
 
 

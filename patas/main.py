@@ -14,7 +14,7 @@ import sys
 
 
 BASIC_OPTIONS   = ['explore', 'parse', 'query', 'draw', 'doctor']
-DRAW_OPTIONS    = ['heatmap', 'categorical', 'lines', 'bars']
+DRAW_OPTIONS    = ['heatmap', 'categories', 'lines', 'bars']
 
 
 def parse_base_experiment(args, experiment:schemas.BaseExperimentSchema):
@@ -308,14 +308,14 @@ def do_draw_heatmap(argv):
                             args.fig_size, args.aggfunc)
 
 
-def do_draw_categorical(argv):
+def do_draw_categories(argv):
     
     from patas import graphics
 
-    args = argparsers.parse_patas_draw_categorical(argv)
+    args = argparsers.parse_patas_draw_categories(argv)
 
-    graphics.render_categorical(args.x_column, args.y_column, args.hue_column, 
-                         args.title, args.x_label, args.y_label, args.hue_label, 
+    graphics.render_categories(args.x_column, args.y_column, args.hue_column, 
+                         args.title, args.x_label, args.y_label, args.legend_label, 
                          args.x_change, args.y_change, args.hue_change, 
                          args.input_file, args.output_file, 
                          args.fig_size, args.errorbar)
@@ -326,18 +326,12 @@ def do_draw_lines(argv):
 
     args = argparsers.parse_patas_draw_lines(argv)
 
-    lines = [
-        (line.x_column, line.y_column, line.x_change, line.y_change, line.r_function, line.label, line.style, line.marker, line.marker_size) 
-        for line in args.lines
-    ]
-
-    graphics.render_lines(lines, args.title, args.size, 
-                          args.x_label, args.r_label, 
+    graphics.render_lines(args.title, args.x_label, args.y_label, args.legend_label, 
+                          args.x_column, args.y_column, args.hue_column, args.style_column,
+                          args.x_change, args.y_change, args.hue_change,  args.style_change,
                           args.input_file, args.output_file, 
-                          args.show_grid, args.border, args.show_error, 
-                          args.ticks, args.ticks_format, args.legend_location,
-                          args.verbose)
-
+                          args.fig_size, args.err_style, args.errorbar)
+    
 
 def do_draw_lines_3d(argv):
     abort("Draw lines_3d is not implemented yet.")
