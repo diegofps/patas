@@ -14,7 +14,7 @@ import sys
 
 
 BASIC_OPTIONS   = ['explore', 'parse', 'query', 'draw', 'doctor']
-DRAW_OPTIONS    = ['heatmap', 'lines', 'bars']
+DRAW_OPTIONS    = ['heatmap', 'categorical', 'lines', 'bars']
 
 
 def parse_base_experiment(args, experiment:schemas.BaseExperimentSchema):
@@ -308,6 +308,18 @@ def do_draw_heatmap(argv):
                             args.fig_size, args.aggfunc)
 
 
+def do_draw_categorical(argv):
+    
+    from patas import graphics
+
+    args = argparsers.parse_patas_draw_categorical(argv)
+
+    graphics.render_categorical(args.x_column, args.y_column, args.hue_column, 
+                         args.title, args.x_label, args.y_label, args.hue_label, 
+                         args.x_change, args.y_change, args.hue_change, 
+                         args.input_file, args.output_file, 
+                         args.fig_size, args.errorbar)
+
 def do_draw_lines(argv):
     
     from patas import graphics
@@ -329,21 +341,6 @@ def do_draw_lines(argv):
 
 def do_draw_lines_3d(argv):
     abort("Draw lines_3d is not implemented yet.")
-
-
-def do_draw_bars(argv):
-    
-    from patas import graphics
-
-    args = argparsers.parse_patas_draw_bars(argv)
-
-    graphics.render_bars(args.x_column, args.y_column, 
-                         args.title, args.x_label, args.r_label, 
-                         args.x_change, args.y_change, args.r_format, 
-                         args.input_file, args.output_file, 
-                         args.size, args.r_function, args.bar_color, args.bar_size, args.horizontal, args.show_grid, 
-                         args.ticks, args.ticks_format, args.border, args.show_error,
-                         args.verbose)
 
 
 def do_draw_bars_3d(args):

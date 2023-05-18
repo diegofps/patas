@@ -384,13 +384,20 @@ def parse_patas_draw_heatmap(argv):
     return parser.parse_args(args=argv)
 
 
-def parse_patas_draw_bars(argv):
+def parse_patas_draw_categorical(argv):
 
     parser = argparse.ArgumentParser(
                         prog='patas draw bars',
                         description='Draws bars from a csv file',
                         epilog="Check the README.md to learn more tips on how to use this feature: https://github.com/diegofps/patas/blob/main/README.md",
                         formatter_class=argparse.RawDescriptionHelpFormatter)
+
+    # x_column, y_column, hue_column,
+    # title, x_label, y_label, hue_label,
+    # x_change, y_change, hue_change, 
+    # input_file, output_file, 
+    # fig_size, aggfunc, 
+    # errorbar
 
     # INITIAL PARAMETERS
 
@@ -405,7 +412,7 @@ def parse_patas_draw_bars(argv):
     parser.add_argument('--x-column', 
                         type=str, 
                         required=True, 
-                        metavar='X_COLUMN',
+                        metavar='NAME',
                         dest='x_column',
                         help='name of the x column in the data source',
                         action='store')
@@ -413,9 +420,16 @@ def parse_patas_draw_bars(argv):
     parser.add_argument('--y-column', 
                         type=str, 
                         required=True, 
-                        metavar='Y_COLUMN',
+                        metavar='NAME',
                         dest='y_column',
                         help='name of the y column in the data source',
+                        action='store')
+
+    parser.add_argument('--hue-column', 
+                        type=str, 
+                        metavar='NAME',
+                        dest='hue_column',
+                        help='name of the hue column in the data source, if necessary',
                         action='store')
 
     parser.add_argument('--title', 
@@ -432,11 +446,18 @@ def parse_patas_draw_bars(argv):
                         help='label for the x axis',
                         action='store')
 
-    parser.add_argument('--r-label', 
+    parser.add_argument('--y-label', 
                         type=str, 
-                        dest='r_label',
+                        dest='y_label',
                         metavar='L',
-                        help='label for the reduced values',
+                        help='label for the y axis',
+                        action='store')
+
+    parser.add_argument('--hue-label', 
+                        type=str, 
+                        dest='hue_label',
+                        metavar='L',
+                        help='label for the hue legend',
                         action='store')
 
     parser.add_argument('--output', 
@@ -450,94 +471,46 @@ def parse_patas_draw_bars(argv):
                         type=str, 
                         metavar='CODE',
                         dest='x_change',
-                        help='transforms the x column using the variables X, Y, Z, math, and i. For example: --x-change "math.log2(X[i])"',
+                        help='transforms the x column. For example: --x-change "math.log2(X[i])"',
                         action='store')
 
     parser.add_argument('--y-change', 
                         type=str, 
                         metavar='CODE',
                         dest='y_change',
-                        help='transforms the y column using the variables X, Y, Z, math, and i. For example: --y-change "math.log2(Y[i])"',
+                        help='transforms the y column. For example: --y-change "math.log2(Y[i])"',
                         action='store')
 
-    parser.add_argument('--r-function', 
+    parser.add_argument('--hue-change', 
                         type=str, 
-                        choices=('sum', 'mean', 'std', 'product', 'min', 'max'),
-                        default='mean',
-                        dest='r_function',
-                        metavar='NAME',
-                        help='each x value will usualy map to multiple values, this function defines how to reduce them.',
-                        action='store')
-
-    parser.add_argument('--r-format', 
-                        type=str,  
                         metavar='CODE',
-                        dest='r_format',
-                        help='formats reduced values for display. Example: --r-format \'int(D[x]*100)\'',
+                        dest='hue_change',
+                        help='transforms the hue column. For example: --y-change "math.log2(Y[i])"',
                         action='store')
 
-    parser.add_argument('--size', 
+    # parser.add_argument('--aggfunc', 
+    #                     type=str, 
+    #                     choices=('sum', 'mean', 'std', 'product', 'min', 'max', 'count'),
+    #                     default='mean',
+    #                     dest='aggfunc',
+    #                     metavar='NAME',
+    #                     help='when a single x value maps to multiple values, use this function to reduce them.',
+    #                     action='store')
+
+    parser.add_argument('--fig-size', 
                         type=float, 
                         nargs=2, 
-                        dest='size',
+                        dest='fig_size',
                         metavar='W H',
-                        help='size of output image',
+                        help='size of the output image',
                         action='store')
 
-    parser.add_argument('--verbose', 
-                        help='print extra info during execution',
-                        action='store_true')
-
-    parser.add_argument('--bar-color', 
-                        type=str, 
-                        dest='bar_color',
-                        metavar='COLOR',
-                        help='an HTML color without #',
+    parser.add_argument('--errorbar',  
+                        dest='errorbar',
+                        choices=("sd", "se", "pi", "ci"),
+                        default=None,
+                        help='show error: standard deviation, standard error, percentile interval or confidence interval',
                         action='store')
-
-    parser.add_argument('--bar-size', 
-                        type=float, 
-                        dest='bar_size',
-                        metavar='W',
-                        help='size of each bar, a value from 0.0 to 1.0',
-                        action='store')
-
-    parser.add_argument('--border', 
-                        type=str,
-                        choices=('all', 'ticks', 'lines', 'none'),
-                        dest='border',
-                        metavar='MODE',
-                        help='style of the border, default is all',
-                        action='store')
-
-    parser.add_argument('--ticks', 
-                        type=int, 
-                        dest='ticks',
-                        metavar='T',
-                        help='number of values to appear in the axis',
-                        action='store')
-
-    parser.add_argument('--ticks-format', 
-                        type=str,  
-                        metavar='CODE',
-                        dest='ticks_format',
-                        help='formats tick display value using its current value t. Example: --ticks-format \'t:02f\'',
-                        action='store')
-
-    parser.add_argument('--horizontal',  
-                        dest='horizontal',
-                        help='set this flag if you want horizontal bars',
-                        action='store_true')
-
-    parser.add_argument('--show-grid',  
-                        dest='show_grid',
-                        help='set this flag if you want gridlines displayed',
-                        action='store_true')
-
-    parser.add_argument('--show-error',  
-                        dest='show_error',
-                        help='set this flag if you want the standard deviation to be shown',
-                        action='store_true')
 
     return parser.parse_args(args=argv)
 

@@ -3,16 +3,46 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 import numpy as np
+import math
 
 
 sns.set_theme()
+# sns.set_theme(style="whitegrid")
+
+class ColumnChanger:
+    def __init__(self, change_function, column_name, context_name, function_name, add_f_string):
+        self.column_name = column_name
+        self.change_function = change_function
+        self.context_name = context_name
+        self.function_name = function_name
+        self.add_f_string = add_f_string
+        self.result = None
 
 
-def change_column(data, column_name, change_function, context, name, add_f_string):
-    if change_function:
-        program = 'f"{' + change_function + '}"' if add_f_string else change_function
-        change_function = compile(program, name, 'eval')
-        data[column_name] = [eval(change_function, {'i':i, **context}) for i in range(data.shape[0])]
+class ColumnsChanger:
+
+    def __init__(self):
+        self.changers:list[ColumnChanger] = []
+    
+    def add(self, change_function, column_name, context_name, function_name, add_f_string):
+        self.changers.append(ColumnChanger(change_function, column_name, context_name, function_name, add_f_string))
+    
+    def apply(self, data):
+        context = { 'math': math, 'pd': pd, 'np': np }
+
+        for changer in self.changers:
+            if changer.column_name:
+                context[changer.context_name] = data[changer.column_name]
+        
+        for changer in self.changers:
+            if changer.change_function:
+                program = 'f"{' + changer.change_function + '}"' if changer.add_f_string else changer.change_function
+                change_function = compile(program, changer.function_name, 'eval')
+                changer.result = [eval(change_function, {'i':i, **context}) for i in range(data.shape[0])]
+        
+        for changer in self.changers:
+            if changer.column_name and changer.result:
+                data[changer.column_name] = changer.result
 
 
 def render_heatmap(x_column, y_column, z_column,
@@ -23,15 +53,11 @@ def render_heatmap(x_column, y_column, z_column,
 
     data_long = pd.read_csv(input_file)
 
-    context = {
-        'X': data_long[x_column],
-        'Y': data_long[y_column],
-        'Z': data_long[z_column],
-    }
-
-    change_column(data_long, x_column, x_change, context, 'patas.draw.heatmap.x_change', True )
-    change_column(data_long, y_column, y_change, context, 'patas.draw.heatmap.y_change', True )
-    change_column(data_long, z_column, z_change, context, 'patas.draw.heatmap.z_change', False)
+    cc = ColumnsChanger()
+    cc.add(x_change, x_column, 'X', 'patas.draw.heatmap.x_change', True)
+    cc.add(y_change, y_column, 'Y', 'patas.draw.heatmap.y_change', True)
+    cc.add(z_change, z_column, 'Z', 'patas.draw.heatmap.z_change', False)
+    cc.apply(data_long)
 
     data = data_long.pivot_table(values=z_column, index=y_column, columns=x_column, aggfunc=aggfunc)
 
@@ -60,17 +86,40 @@ def render_heatmap(x_column, y_column, z_column,
         plt.show()
 
 
-def render_bars(x_column, y_column, 
-                title, x_label, r_label, 
-                x_change, y_change, r_format, 
-                input_file, output_file, 
-                size, r_function, bar_color, bar_size, horizontal, show_grid, 
-                ticks, ticks_format, border, show_error,
-                verbose):
+def render_categorical(x_column, y_column, hue_column,
+                       title, x_label, y_label, hue_label,
+                       x_change, y_change, hue_change, 
+                       input_file, output_file, 
+                       fig_size, errorbar):
     
-    # Remove borders and display/save
+    data_long = pd.read_csv(input_file)
 
-    fig.tight_layout()
+    cc = ColumnsChanger()
+    cc.add(x_change, x_column, 'X', 'patas.draw.heatmap.x_change', True)
+    cc.add(y_change, y_column, 'Y', 'patas.draw.heatmap.y_change', True)
+    cc.add(hue_change, hue_column, 'HUE', 'patas.draw.heatmap.hue_change', False)
+    cc.apply(data_long)
+
+    g = sns.catplot(data=data_long, kind="bar", x=x_column, y=y_column, hue=hue_column, errorbar=errorbar)
+
+    if fig_size:
+        g.fig.set_size_inches(*fig_size)
+        
+    g.despine(left=True)
+    g.fig.subplots_adjust(left=.08, bottom=.14)
+
+    if hue_label:
+        g.legend.set_title(hue_label)
+
+    if x_label:
+        g.ax.set_xlabel(x_label)
+    
+    if y_label:
+        g.ax.set_ylabel(y_label)
+
+    if title:
+        g.fig.subplots_adjust(top=.9)
+        g.ax.set_title(title)
 
     if output_file:
         plt.savefig(output_file)

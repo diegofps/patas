@@ -112,7 +112,7 @@ A possible output for the previous command would be.
 
 ## patas draw
 
-Patas will also help you quickly create basic graphics based on the data in the csv file. This might help you inspect the data and get some quick insights without needing to create a python script for this. As of now, patas supports three drawing functions: `heatmap`, `bars`, and `lines`.
+Patas can also help you quickly create basic graphics based on the data in the csv file. It provides a wrapper for a few seaborn functions to quickly generate graphics, without needing to create a python script for this. If you need complex charts, though, we recommend you use the advanced graphics library of your preference. As of now, patas provides four drawing functions: `heatmap`, `categorical`, `bars`, and `lines`.
 
 ### Heatmap
 
@@ -149,6 +149,37 @@ patas draw heatmap \
 
 ![Extended heatmap example](https://github.com/diegofps/patas/blob/main/docs/images/heatmap2.png?raw=true)
 
+### Categorical
+
+```shell
+patas draw categorical \
+    --input pataslab/grid/grid.csv \
+    --x-column in_activation \
+    --y-column out_test_acc \
+    --fig-size 10 7 \
+    --x-label 'Activation function' \
+    --y-label 'Test Accuracy' \
+    --title 'Test performance by activation function'
+```
+
+![Bars example](https://github.com/diegofps/patas/blob/main/docs/images/categorical1.png?raw=true)
+
+```shell
+patas draw categorical \
+    --input pataslab/grid/grid.csv \
+    --x-column in_activation \
+    --hue-column in_preprocessing \
+    --y-column out_test_acc \
+    --fig-size 10 4 \
+    --x-label 'Activation function' \
+    --y-label 'Test Accuracy' \
+    --hue-label 'Preprocessing' \
+    --errorbar 'sd' \
+    --title 'Test performance by activation function and preprocessing'
+```
+
+![Bars example](https://github.com/diegofps/patas/blob/main/docs/images/categorical2.png?raw=true)
+
 ### Bars
 
 ```shell
@@ -160,7 +191,7 @@ patas draw bars \
     --input test.csv \
     --x-column in_neurons \
     --y-column out_test_acc \
-    --size 10 2
+    --size 10 4
 ```
 
 ![Bars example](https://github.com/diegofps/patas/blob/main/docs/images/bars1.png?raw=true)
