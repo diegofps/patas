@@ -422,6 +422,9 @@ class GridExperimentSchema(BaseExperimentSchema):
 
     def on_start(self, scheduler):
         
+        # TODO: Generate tasks in parallel
+        # TODO: Start tasks while generating them
+
         combination_idd = -1
         task_idd        = -1
 

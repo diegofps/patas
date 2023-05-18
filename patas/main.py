@@ -5,8 +5,8 @@ try:
 except:
     from patas import consts as c
 
-from collections import defaultdict
 from patas.utils import error, node_cpu_count, abort, warn
+from collections import defaultdict
 from patas import argparsers
 from patas import schemas
 
@@ -14,8 +14,7 @@ import sys
 
 
 BASIC_OPTIONS   = ['explore', 'parse', 'query', 'draw', 'doctor']
-DRAW_OPTIONS    = ['heatmap', 'lines', 'lines_3d', 'bars', 'bars_3d', 'boxplot', 'violin', 'scatter', 'scatter_3d', 'surface', 'pie']
-EXPLORE_OPTIONS = ['grid', 'cdeepso']
+DRAW_OPTIONS    = ['heatmap', 'lines', 'bars']
 
 
 def parse_base_experiment(args, experiment:schemas.BaseExperimentSchema):
@@ -289,7 +288,7 @@ def do_parse(argv):
 
 def do_query(argv):
 
-    from patas.query_engine import QueryEngine
+    from patas.query import QueryEngine
     
     args   = argparsers.parse_patas_query(argv)
     engine = QueryEngine(args.patas_folder)
@@ -303,11 +302,10 @@ def do_draw_heatmap(argv):
     args = argparsers.parse_patas_draw_heatmap(argv)
 
     graphics.render_heatmap(args.x_column, args.y_column, args.z_column,
-                            args.title, args.x_label, args.y_label, args.r_label,
-                            args.x_change, args.y_change, args.z_change, args.r_format, 
+                            args.title, args.x_label, args.y_label, args.z_label,
+                            args.x_change, args.y_change, args.z_change, args.annot, args.fmt, 
                             args.input_file, args.output_file, 
-                            args.size, args.r_function, args.colormap, 
-                            args.verbose)
+                            args.fig_size, args.aggfunc)
 
 
 def do_draw_lines(argv):

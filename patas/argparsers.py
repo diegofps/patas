@@ -2,6 +2,7 @@ import argparse
 
 
 DEFAULT_PATAS_OUTPUT_DIR = './pataslab'
+DEFAULT_FIG_SIZE = (10, 7)
 
 
 def parse_patas_explore(argv):
@@ -326,55 +327,59 @@ def parse_patas_draw_heatmap(argv):
                         help='label for the y axis',
                         action='store')
 
-    parser.add_argument('--r-label', 
+    parser.add_argument('--z-label', 
                         type=str, 
-                        dest='r_label',
+                        dest='z_label',
                         metavar='L',
-                        help='label for the reduced data',
+                        help='label for the colorbar',
                         action='store')
 
     parser.add_argument('--output', 
                         type=str, 
+                        default=None,
                         metavar='FILEPATH',
                         dest='output_file',
                         help='filepath of output file to save the image. If not present, the result will be displayed',
                         action='store')
 
-    parser.add_argument('--r-function', 
+    parser.add_argument('--aggfunc', 
                         type=str, 
-                        choices=('sum', 'mean', 'std', 'product', 'min', 'max'),
+                        choices=('sum', 'mean', 'std', 'product', 'min', 'max', 'count'),
                         default='mean',
-                        dest='r_function',
+                        dest='aggfunc',
                         metavar='NAME',
-                        help='each y,x pair will usualy map to multiple values, this function defines how to reduce them.',
+                        help='aggregation function to use when x,y coordinates map to multiple values.',
                         action='store')
 
-    parser.add_argument('--r-format', 
+    parser.add_argument('--fmt', 
                         type=str,  
                         metavar='CODE',
-                        dest='r_format',
-                        help='formats the reduced values for display. Example: --r-format \'int(R[y,x]*100)\'',
+                        dest='fmt',
+                        default='.2f',
+                        help='string used to format annotations',
                         action='store')
 
-    parser.add_argument('--size', 
+    parser.add_argument('--fig-size', 
                         type=float, 
                         nargs=2, 
-                        dest='size',
+                        dest='fig_size',
                         metavar='W H',
+                        default=DEFAULT_FIG_SIZE,
                         help='size of output image',
                         action='store')
 
-    parser.add_argument('--verbose', 
-                        help='print extra info during execution',
+    parser.add_argument('--annot', 
+                        help='Enable cell annotation',
+                        default=False,
                         action='store_true')
 
-    parser.add_argument('--colormap', 
-                        type=str, 
-                        dest='colormap',
-                        nargs='*',
-                        metavar=('NAME|C1', 'C2...'),
-                        help='list of HTML colors without # or name of colormap from https://matplotlib.org/stable/tutorials/colors/colormaps.html',
-                        action='store')
+    # parser.add_argument('--colormap', 
+    #                     type=str, 
+    #                     dest='colormap',
+    #                     nargs='*',
+    #                     metavar=('NAME|C1', 'C2...'),
+    #                     help='list of HTML colors without # or name of colormap from https://matplotlib.org/stable/tutorials/colors/colormaps.html',
+    #                     action='store')
 
     return parser.parse_args(args=argv)
 

@@ -30,7 +30,7 @@ setuptools.setup(
         ],
     },
     install_requires=[
-        'csvkit', 'matplotlib'
+        'csvkit', 'seaborn'
     ],
     extras_require={
         "full": []

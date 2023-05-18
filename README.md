@@ -112,7 +112,7 @@ A possible output for the previous command would be.
 
 ## patas draw
 
-Patas will also help you quickly create basic graphics based on the data in the csv file. This might help you inspect the data and get some quick insights. As of now, patas supports three graphic types, `heatmap`, `bars`, and `lines`.
+Patas will also help you quickly create basic graphics based on the data in the csv file. This might help you inspect the data and get some quick insights without needing to create a python script for this. As of now, patas supports three drawing functions: `heatmap`, `bars`, and `lines`.
 
 ### Heatmap
 
@@ -122,28 +122,29 @@ patas draw heatmap \
     --x-column in_neurons \
     --y-column in_activation \
     --z-column out_test_acc \
-    --size 10 2
+    --fig-size 15 3
 ```
 
 ![Basic heatmap example](https://github.com/diegofps/patas/blob/main/docs/images/heatmap1.png?raw=true)
 
 ```shell
 patas draw heatmap \
-    --input 'pataslab/grid/grid.csv' \
-    --title 'Grid Search Results' \
+    --input pataslab/grid/grid.csv \
+    --output heatmap.png \
+    --title 'Average test accuracy' \
     --x-column in_neurons \
-    --x-change 'int(X[i])*2' \
-    --x-label Neurons \
+    --x-label 'Number of Neurons' \
+    --x-change 'X[i]' \
     --y-column in_activation \
+    --y-label 'Activation function' \
     --y-change 'Y[i][:3]' \
-    --y-label 'Activation Function' \
     --z-column out_test_acc \
-    --z-change 'Z[i]*100' \
-    --r-function min \
-    --r-format 'int(R[y,x])' \
-    --r-label Accuracy \
-    --size 10 2 \
-    --colormap AAAAAA 000011
+    --z-label 'Accuracy' \
+    --z-change 'int(Z[i]*100)' \
+    --fig-size 15 3 \
+    --annot \
+    --aggfunc mean \
+    --fmt '.0f'
 ```
 
 ![Extended heatmap example](https://github.com/diegofps/patas/blob/main/docs/images/heatmap2.png?raw=true)
