@@ -49,7 +49,7 @@ def render_heatmap(x_column, y_column, z_column,
                    title, x_label, y_label, z_label,
                    x_change, y_change, z_change, annot, fmt, 
                    input_file, output_file, 
-                   fig_size, aggfunc):
+                   fig_size, aggfunc, z_range):
 
     data_long = pd.read_csv(input_file)
 
@@ -67,7 +67,7 @@ def render_heatmap(x_column, y_column, z_column,
         cbar_kws['label'] = z_label
 
     f, ax = plt.subplots(figsize=fig_size)
-    g = sns.heatmap(data, annot=annot, fmt=fmt, linewidths=.5, ax=ax, cbar_kws=cbar_kws)
+    g = sns.heatmap(data, annot=annot, fmt=fmt, linewidths=.5, ax=ax, vmin=z_range[0], vmax=z_range[1], cbar_kws=cbar_kws)
 
     if x_label:
         g.set_xlabel(x_label)

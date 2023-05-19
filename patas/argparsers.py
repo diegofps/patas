@@ -334,6 +334,15 @@ def parse_patas_draw_heatmap(argv):
                         help='label for the colorbar',
                         action='store')
 
+    parser.add_argument('--z-range', 
+                        type=float, 
+                        dest='z_range',
+                        default=(None, None),
+                        nargs=2,
+                        metavar='MIN MAX',
+                        help='set the minimum and maximum values for the z legend',
+                        action='store')
+
     parser.add_argument('--output', 
                         type=str, 
                         default=None,

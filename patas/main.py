@@ -305,7 +305,7 @@ def do_draw_heatmap(argv):
                             args.title, args.x_label, args.y_label, args.z_label,
                             args.x_change, args.y_change, args.z_change, args.annot, args.fmt, 
                             args.input_file, args.output_file, 
-                            args.fig_size, args.aggfunc)
+                            args.fig_size, args.aggfunc, args.z_range)
 
 
 def do_draw_categories(argv):
