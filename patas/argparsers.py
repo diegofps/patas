@@ -149,7 +149,6 @@ def parse_patas_explore(argv):
     parser.add_argument('--cmd',
                         type=str,
                         metavar='CMD',
-                        required=True,
                         dest='cmd',
                         help="command to be executed. Use {VAR_NAME} to replace its parameters with a named variable",
                         action='append')

@@ -1,4 +1,4 @@
-from .utils import expand_path, error, warn, info, debug, critical, abort, readlines, estimate, human_time, quote, colors, confirm
+from .utils import expand_path, error, warn, info, debug, critical, abort, readlines, estimate, human_time, quote, colors, confirm, plural
 from .schemas import ClusterSchema, NodeSchema, Task
 
 from multiprocessing import Process, Queue
@@ -378,7 +378,7 @@ class Scheduler():
 
         total_tasks = 0
         for experiment in experiments:
-            experiment.show_summary()
+            print(experiment.summary())
             total_tasks += experiment.number_of_tasks()
         
         # Display clusters
@@ -388,7 +388,7 @@ class Scheduler():
         total_nodes   = 0
         total_workers = 0
         for cluster in clusters:
-            cluster.show_summary()
+            print(cluster.summary())
             total_nodes   += cluster.number_of_nodes()
             total_workers += cluster.number_of_workers()
             
@@ -517,22 +517,24 @@ class Scheduler():
         # Start workers
 
         print()
-        info(f"Starting {len(self.workers)} worker(s)")
+        num_workers = len(self.workers)
+        info(f"Starting {num_workers} {plural(num_workers, 'worker')}")
 
         for worker in self.workers:
             worker.start(self.queue)
         
-        info("Worker(s) started")
+        info(f"{plural(num_workers, 'Worker')} started")
 
         # Start experiments
 
         print()
-        info(f"Starting {len(self.experiments)} experiment(s)")
+        num_experiments = len(self.experiments)
+        info(f"Starting {num_experiments} {plural(num_experiments, 'experiment')}")
         
         for experiment in self.experiments:
             experiment.on_start(self)
         
-        info("Experiment(s) started")
+        info(f"{plural(num_experiments, 'Experiment')} started")
 
         # Main loop
 

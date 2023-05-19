@@ -391,6 +391,7 @@ def node_cpu_count(user, hostname, port, default):
         return int(output[0])
     except ValueError:
         return default
+
                 
 def confirm():
 
@@ -405,3 +406,17 @@ def confirm():
                 print('Invalid option')
     except KeyboardInterrupt:
         sys.exit(0)
+
+
+def indent_lines(text, spaces=4):
+    prefix = ' ' * spaces
+    return prefix + ('\n' + prefix).join(text.split('\n'))
+
+
+def plural(qtt, word, plural_word=None):
+    if qtt <= 1:
+        return word
+    elif plural_word is None:
+        return word + 's'
+    else:
+        return plural_word

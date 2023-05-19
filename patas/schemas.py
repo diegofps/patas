@@ -1,4 +1,4 @@
-from .utils import error, warn, abort, clean_folder
+from .utils import error, warn, abort, clean_folder, indent_lines, plural
 from functools import reduce
 
 import hashlib
@@ -23,6 +23,7 @@ def format_as_dict(obj):
         return {k:format_as_dict(v) for k,v in obj.items() if not k.startswith('_')}
 
     return obj
+
 
 
 class Schema:
@@ -111,6 +112,21 @@ class NodeSchema(Schema):
         
         return self.hostname
 
+    def summary(self, indent=None):
+
+        lines = [
+            f"name: {self.name}",
+            f"workers: {self.workers}",
+            f"user: {self.user}",
+            f"hostname: {self.hostname}",
+            f"port: {self.port}",
+            f"tags: {self.tags}",
+
+        ]
+
+        lines = '\n'.join(lines)
+        return indent_lines(lines, indent) if indent else lines
+
 
 class ClusterSchema(Schema):
 
@@ -138,13 +154,14 @@ class ClusterSchema(Schema):
     def number_of_workers(self):
         return reduce(lambda a,b:a+b.workers, self.nodes, 0)
 
-    def show_summary(self, indent=4):
+    def summary(self, indent=None):
 
-        lines = [f"'{self.name}' has {self.number_of_nodes()} node(s):"] + \
-                [f"    '{node.name}' has {node.workers} worker(s)" for node in self.nodes]
+        nodes = self.number_of_nodes()
+        lines = [f"'{self.name}' ({nodes} {plural(nodes, 'node')}):"] + \
+                [f"    '{node.name}'\n{node.summary(8)}" for node in self.nodes]
         
-        data = ' ' * indent + ('\n' + ' ' * indent).join(lines)
-        print(data)
+        lines = '\n'.join(lines)
+        return indent_lines(lines, indent) if indent else lines
     
 
 class ListVariableSchema(Schema):
@@ -325,7 +342,7 @@ class GridExperimentSchema(BaseExperimentSchema):
         
         return reduce(lambda a,b: a*len(b.values), self.vars, 1) * self.repeat
     
-    def show_summary(self, indent=4):
+    def summary(self, indent=None):
 
         combinations = reduce(lambda a,b: a*len(b.values), self.vars, 1)
         tasks = combinations * self.repeat
@@ -333,13 +350,14 @@ class GridExperimentSchema(BaseExperimentSchema):
 
         attrs = ['experiment_idd', 'redo_tasks', 'workdir', 'task_filters', 'cmd', 'max_tries', 'repeat']
 
-        lines = [f"'{self.name}' has {len(self.vars)} variable(s), {combinations} combination(s), {tasks} task(s), and {filters} task-filter(s):"] + \
-                [f"    {name}: {getattr(self, name)}" for name in attrs] + \
-                [ '    Variables:'] + \
-                [f"        {v.name} = {str(v.values)}, len = {len(v.values)}" for v in self.vars]
+        lines  = [f"'{self.name}' ({tasks} {plural(tasks, 'task')}):"]
+        lines += [f"    {name}: {getattr(self, name)}" for name in attrs]
+        lines += [f"    combinations: {combinations}"]
+        lines += [f'    variables ({len(self.vars)}):']
+        lines += [f"        {v.name} = {str(v.values)}, len = {len(v.values)}" for v in self.vars]
         
-        data = ' ' * indent + ('\n' + ' ' * indent).join(lines)
-        print(data)
+        lines = '\n'.join(lines)
+        return indent_lines(lines, indent) if indent else lines
 
     def _combinations(self, variables, combination={}):
 

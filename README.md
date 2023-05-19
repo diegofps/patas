@@ -44,6 +44,14 @@ Here is a short description of the parameters above:
 `--node` - defines a node to execute the program. This may be any machine accessible via SSH that won't ask for a password. This command accepts an optional argument to indicate the number of workers in the machine. If non is provided, it will default to the number of cores in the machine. You may want to check the program `ssh-copy-id` to learn how to install a public key on a remote machine and log in without a password. 
 `--repeat` defines the number of times the program will be called using a given variable combination. In this example, the parameter neurons define `25` values, parameter preprocessing defines `3` values and the paramter activation define `4` values. This will generate `300 combinations`. Considering the repeat parameter has the value `10`, the program will be excuted `3000` timesm. That is, we asked patas to do `3000 tasks`. You can define as many variables as you want, but the more you have the longer it will take to execute.
 
+You may also define the experiment and cluster nodes in separate files. This makes it easier to load and mix configurations and you may load more than one experiment or cluster file together.
+
+```shell
+patas explore \
+    --experiment ./experiment.yaml \
+    --cluster ./cluster.yaml
+```
+
 ## patas parse
 
 When the experiment is done executing, we can parse its outputs and collect the desired values using `patas parse`.
@@ -144,7 +152,8 @@ patas draw heatmap \
     --fig-size 15 3 \
     --annot \
     --aggfunc mean \
-    --fmt '.0f'
+    --fmt '.0f' \
+    --z-range 0 100
 ```
 
 ![Extended heatmap example](https://github.com/diegofps/patas/blob/main/docs/images/heatmap2.png?raw=true)
