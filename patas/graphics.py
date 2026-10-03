@@ -131,8 +131,9 @@ def render_lines(title, x_label, y_label, legend_label,
                  x_column, y_column, hue_column, style_column, 
                  x_change, y_change, hue_change, style_change, 
                  input_file, output_file, 
-                 fig_size, err_style, errorbar):
-    
+                 fig_size, err_style, errorbar,
+                 full_x_ticks, full_y_ticks):
+
     data_long = pd.read_csv(input_file)
 
     cc = ColumnsChanger()
@@ -148,7 +149,11 @@ def render_lines(title, x_label, y_label, legend_label,
 
     fig = ax.get_figure()
 
-    ax.set(xticks=data_long[x_column].unique())
+    if full_x_ticks:
+        ax.set(xticks=data_long[x_column].unique())
+
+    if full_y_ticks:
+        ax.set(yticks=data_long[y_column].unique())
 
     if fig_size:
         fig.set_size_inches(*fig_size)

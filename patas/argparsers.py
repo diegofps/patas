@@ -632,6 +632,18 @@ def parse_patas_draw_lines(argv):
                         help='set the err_style to render: band or bars',
                         action='store')
 
+    parser.add_argument('--full-x-ticks',  
+                        dest='full_x_ticks',
+                        default=False,
+                        help='do not simplify x ticks and draw every coordinate name',
+                        action='store_true')
+
+    parser.add_argument('--full-y-ticks',  
+                        dest='full_y_ticks',
+                        default=False,
+                        help='do not simplify y ticks and draw every coordinate name',
+                        action='store_true')
+
     args = parser.parse_args(args=argv)
 
     return args

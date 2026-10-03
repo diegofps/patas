@@ -320,8 +320,9 @@ def do_draw_categories(argv):
                          args.input_file, args.output_file, 
                          args.fig_size, args.errorbar)
 
+
 def do_draw_lines(argv):
-    
+
     from patas import graphics
 
     args = argparsers.parse_patas_draw_lines(argv)
@@ -330,7 +331,8 @@ def do_draw_lines(argv):
                           args.x_column, args.y_column, args.hue_column, args.style_column,
                           args.x_change, args.y_change, args.hue_change,  args.style_change,
                           args.input_file, args.output_file, 
-                          args.fig_size, args.err_style, args.errorbar)
+                          args.fig_size, args.err_style, args.errorbar,
+                          args.full_x_ticks, args.full_y_ticks)
     
 
 def do_draw_lines_3d(argv):

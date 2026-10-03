@@ -12,7 +12,7 @@ uninstall:
 	sudo pip uninstall patas -y
 
 localinstall: uninstall all
-	sudo pip install ./dist/patas-*-py3-none-any.whl
+	pip install ./dist/patas-*-py3-none-any.whl
 
 getdeps:
 	python3 -m pip install --user --upgrade setuptools wheel
